@@ -1,5 +1,7 @@
 """URL configuration for the Projet_au_choix project."""
+# pyrefly: ignore [missing-import]
 from django.contrib import admin
+# pyrefly: ignore [missing-import]
 from django.urls import include, path
 
 urlpatterns = [
