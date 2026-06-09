@@ -5,6 +5,8 @@ du parcours guidé. `reponse_pour(conversation)` calcule la réponse à
 renvoyer en fonction de l'état courant ; `traiter_message(conversation,
 action, texte)` fait avancer la conversation vers l'état suivant.
 """
+import uuid
+
 from reclamations.models import Reclamation
 
 from .models import Conversation
@@ -16,6 +18,31 @@ def _options_categories():
         {'value': value, 'label': label}
         for value, label in Reclamation.CATEGORIE_CHOICES
     ]
+
+
+def _categorie_label(conversation):
+    return dict(Reclamation.CATEGORIE_CHOICES).get(
+        conversation.contexte.get('categorie'), ''
+    )
+
+
+def _generer_reference_temporaire():
+    """Référence unique posée à la création (le format final REC-AAAA-NNN
+    sera attribué en S2.4)."""
+    return f"TMP-{uuid.uuid4().hex[:10].upper()}"
+
+
+def _creer_reclamation(conversation):
+    """Persiste la réclamation à partir du contexte de la conversation."""
+    reclamation = Reclamation.objects.create(
+        etudiant=conversation.etudiant,
+        categorie=conversation.contexte['categorie'],
+        description=conversation.contexte['description'],
+        statut=Reclamation.STATUT_SOUMISE,
+        reference=_generer_reference_temporaire(),
+    )
+    conversation.contexte['reclamation_id'] = reclamation.pk
+    return reclamation
 
 
 def reponse_pour(conversation):
@@ -42,16 +69,26 @@ def reponse_pour(conversation):
         }
 
     if etat == Conversation.ETAT_DESCRIPTION_DEMANDEE:
-        # Détaillé en S2.3.
-        categorie_label = dict(Reclamation.CATEGORIE_CHOICES).get(
-            conversation.contexte.get('categorie'), ''
-        )
         return {
             'message': (
-                f"Catégorie sélectionnée : {categorie_label}. "
+                f"Catégorie sélectionnée : {_categorie_label(conversation)}. "
                 'Pouvez-vous décrire votre problème ?'
             ),
             'options': [],
+        }
+
+    if etat == Conversation.ETAT_RECAPITULATIF:
+        return {
+            'message': (
+                'Voici le récapitulatif de votre réclamation :\n'
+                f"• Catégorie : {_categorie_label(conversation)}\n"
+                f"• Description : {conversation.contexte.get('description', '')}\n\n"
+                'Confirmez-vous le dépôt ?'
+            ),
+            'options': [
+                {'value': 'confirmer', 'label': 'Confirmer'},
+                {'value': 'annuler', 'label': 'Annuler'},
+            ],
         }
 
     if etat == Conversation.ETAT_SUIVI_REF_DEMANDEE:
@@ -62,6 +99,15 @@ def reponse_pour(conversation):
         }
 
     if etat == Conversation.ETAT_TERMINEE:
+        reclamation_id = conversation.contexte.get('reclamation_id')
+        if reclamation_id:
+            return {
+                'message': (
+                    'Votre réclamation a bien été enregistrée avec le statut « Soumise ». '
+                    "L'administration la prendra en charge prochainement. À bientôt !"
+                ),
+                'options': [],
+            }
         return {'message': 'Conversation terminée. À bientôt !', 'options': []}
 
     return {'message': '...', 'options': []}
@@ -98,5 +144,35 @@ def traiter_message(conversation, action='', texte=''):
         conversation.etat = Conversation.ETAT_DESCRIPTION_DEMANDEE
         conversation.save(update_fields=['etat', 'contexte', 'date_maj'])
         return reponse_pour(conversation)
+
+    if etat == Conversation.ETAT_DESCRIPTION_DEMANDEE:
+        description = (texte or '').strip()
+        if len(description) < 5:
+            return {
+                'message': "Merci de décrire votre problème en quelques mots (au moins 5 caractères).",
+                'options': [],
+            }
+        conversation.contexte['description'] = description
+        conversation.etat = Conversation.ETAT_RECAPITULATIF
+        conversation.save(update_fields=['etat', 'contexte', 'date_maj'])
+        return reponse_pour(conversation)
+
+    if etat == Conversation.ETAT_RECAPITULATIF:
+        if action == 'confirmer':
+            _creer_reclamation(conversation)
+            conversation.etat = Conversation.ETAT_TERMINEE
+            conversation.save(update_fields=['etat', 'contexte', 'date_maj'])
+            return reponse_pour(conversation)
+        if action == 'annuler':
+            conversation.etat = Conversation.ETAT_TERMINEE
+            conversation.save(update_fields=['etat', 'date_maj'])
+            return {
+                'message': 'Dépôt annulé. Aucune réclamation n’a été enregistrée.',
+                'options': [],
+            }
+        return {
+            'message': 'Veuillez confirmer ou annuler.',
+            'options': reponse_pour(conversation)['options'],
+        }
 
     return reponse_pour(conversation)
