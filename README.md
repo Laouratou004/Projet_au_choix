@@ -11,16 +11,15 @@ Application web / chatbot permettant aux étudiants de déposer et suivre leurs 
 
 ## Stack
 
-- Backend : Django 6 + Django REST Framework
+- Django 6 + Django REST Framework
 - Base de données : SQLite (dev)
-- Frontend : à définir (chatbot web)
 
 ## Structure
 
 ```
 Projet_au_choix/
-├── backend/                  # Projet Django
-│   ├── backend/              # Settings / urls / wsgi
+├── src/                      # Code Django
+│   ├── config/               # Settings / urls / wsgi / asgi
 │   ├── users/                # Authentification + rôles étudiant/admin
 │   ├── reclamations/         # Modèles Reclamation + Message
 │   ├── chatbot/              # Logique du chatbot (parcours guidé)
@@ -44,7 +43,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # 4. Appliquer les migrations
-cd backend
+cd src
 python manage.py migrate
 
 # 5. Créer un superutilisateur (admin)
