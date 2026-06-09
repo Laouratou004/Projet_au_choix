@@ -1,0 +1,94 @@
+Issue Type,Epic Name,Summary,Description,Priority,Story Points,Sprint,Assignee,Epic Link,Labels
+Epic,Socle technique et infrastructure,Socle technique et infrastructure,"Mettre en place les fondations techniques du projet : depot de code, environnement de developpement partage et base de donnees.",High,,,sadjosidibe35@outlook.fr,,epic
+Epic,Depot de reclamation,Depot de reclamation,Permettre a l'etudiant de deposer une reclamation via un parcours conversationnel guide.,High,,,laouratoudbah@gmail.com,,epic
+Epic,Suivi des reclamations,Suivi des reclamations,Permettre a l'etudiant de suivre l'avancement de ses reclamations.,Medium,,,laouratoudbah@gmail.com,,epic
+Epic,Traitement et administration,Traitement et administration,"Doter l'administration des outils necessaires pour consulter, filtrer, traiter et suivre les reclamations.",High,,,sadjosidibe35@outlook.fr,,epic
+Epic,Authentification et securite,Authentification et securite,Gerer l'acces des utilisateurs et la separation des roles etudiant / administration.,Medium,,,laouratoudbah@gmail.com,,epic
+Epic,"Qualite, tests et livraison","Qualite, tests et livraison","Garantir la qualite du produit, le tester et preparer la livraison et la demonstration.",High,,,sadjosidibe35@outlook.fr,,epic
+Task,,[S1.1] Initialisation du projet et du depot Git,"Objectif : initialiser le depot Git, la structure des dossiers et l'environnement de developpement partage.
+
+Criteres d'acceptation :
+- Le depot distant est cree et accessible aux deux membres de l'equipe.
+- La structure des dossiers (backend, frontend, base de donnees) est en place.
+- Le projet demarre en local sans erreur.",High,3,Sprint 1,sadjosidibe35@outlook.fr,Socle technique et infrastructure,commun
+Task,,[S1.2] Conception et creation de la base de donnees,"Objectif : modeliser et creer les tables Reclamation, Utilisateur et Message/Suivi conformement au cahier des charges.
+
+Criteres d'acceptation :
+- Le schema reprend les entites definies dans le cahier des charges.
+- Le script de creation de la base est versionne dans le depot.
+- Des donnees de test peuvent etre inserees et lues.",High,3,Sprint 1,laouratoudbah@gmail.com,Socle technique et infrastructure,commun
+Story,,[S2.1] Demarrage de la conversation avec le chatbot,"En tant qu'etudiant, je veux demarrer une conversation avec le chatbot afin d'initier le depot d'une reclamation.
+
+Criteres d'acceptation :
+- Le chatbot affiche un message d'accueil.
+- Deux options sont proposees : deposer une reclamation ou en suivre une.
+- Le parcours de depot se lance lorsque l'etudiant le choisit.",High,3,Sprint 1,laouratoudbah@gmail.com,Depot de reclamation,module-etudiant
+Story,,[S2.2] Selection de la categorie de reclamation,"En tant qu'etudiant, je veux choisir la categorie de ma reclamation afin qu'elle soit correctement orientee.
+
+Criteres d'acceptation :
+- Les quatre categories sont proposees : Notes, Scolarite, Examens, Bourse.
+- La categorie choisie est associee a la reclamation.",High,2,Sprint 1,laouratoudbah@gmail.com,Depot de reclamation,module-etudiant
+Story,,[S2.3] Saisie et soumission de la reclamation,"En tant qu'etudiant, je veux decrire mon probleme et soumettre ma reclamation afin qu'elle soit enregistree et prise en charge.
+
+Criteres d'acceptation :
+- L'etudiant peut saisir une description libre.
+- Un recapitulatif est affiche avant validation.
+- A la confirmation, la reclamation est enregistree avec le statut Soumise.",High,3,Sprint 1,laouratoudbah@gmail.com,Depot de reclamation,module-etudiant
+Story,,[S2.4] Generation d'une reference de suivi,"En tant qu'etudiant, je veux recevoir une reference unique apres soumission afin de pouvoir suivre ma reclamation ulterieurement.
+
+Criteres d'acceptation :
+- Une reference unique est generee (ex. REC-2026-001).
+- La reference est affichee a l'etudiant et stockee en base.",Medium,2,Sprint 1,laouratoudbah@gmail.com,Depot de reclamation,module-etudiant
+Story,,[S3.1] Consultation du statut d'une reclamation,"En tant qu'etudiant, je veux consulter le statut de ma reclamation a partir de sa reference afin de suivre son traitement.
+
+Criteres d'acceptation :
+- L'etudiant saisit une reference de reclamation.
+- Le statut actuel et la date de derniere mise a jour sont affiches.
+- Une reference inconnue renvoie un message d'erreur clair.",High,3,Sprint 2,laouratoudbah@gmail.com,Suivi des reclamations,module-etudiant
+Story,,[S3.2] Suggestion automatique de categorie (bonus),"En tant qu'etudiant, je veux que le chatbot me suggere une categorie a partir de ma description afin de gagner du temps.
+
+Criteres d'acceptation :
+- Une categorie est proposee a partir de mots-cles de la description.
+- L'etudiant peut accepter ou modifier la suggestion.",Low,3,Sprint 2,laouratoudbah@gmail.com,Suivi des reclamations,module-etudiant
+Story,,[S4.1] Liste des reclamations recues,"En tant qu'administrateur, je veux consulter la liste des reclamations recues afin de les traiter.
+
+Criteres d'acceptation :
+- Les reclamations sont affichees avec reference, categorie, statut et date.
+- La liste est triee par date decroissante.",High,3,Sprint 1,sadjosidibe35@outlook.fr,Traitement et administration,module-admin
+Story,,[S4.2] Filtres par categorie et statut,"En tant qu'administrateur, je veux filtrer les reclamations afin de retrouver rapidement celles a traiter.
+
+Criteres d'acceptation :
+- Filtrage possible par categorie.
+- Filtrage possible par statut.
+- Les filtres peuvent etre combines.",Medium,2,Sprint 1,sadjosidibe35@outlook.fr,Traitement et administration,module-admin
+Story,,[S4.3] Mise a jour du statut d'une reclamation,"En tant qu'administrateur, je veux faire evoluer le statut d'une reclamation afin de refleter son avancement.
+
+Criteres d'acceptation :
+- Le statut peut passer par En cours, Resolue et Cloturee.
+- La date de mise a jour est enregistree a chaque changement.",High,3,Sprint 2,sadjosidibe35@outlook.fr,Traitement et administration,module-admin
+Story,,[S4.4] Reponse a l'etudiant,"En tant qu'administrateur, je veux ajouter une reponse a une reclamation afin d'informer l'etudiant du traitement.
+
+Criteres d'acceptation :
+- L'administrateur peut saisir un message de reponse.
+- Le message est associe a la reclamation et horodate.",Medium,3,Sprint 2,sadjosidibe35@outlook.fr,Traitement et administration,module-admin
+Story,,[S4.5] Tableau de bord et statistiques,"En tant qu'administrateur, je veux un tableau de bord afin d'avoir une vue d'ensemble des reclamations.
+
+Criteres d'acceptation :
+- Le nombre de reclamations par statut est affiche.
+- Le nombre de reclamations par categorie est affiche.",Low,2,Sprint 2,sadjosidibe35@outlook.fr,Traitement et administration,module-admin
+Task,,[S5.1] Authentification etudiant / administration,"En tant qu'utilisateur, je veux m'authentifier afin d'acceder a l'espace correspondant a mon role.
+
+Criteres d'acceptation :
+- Connexion par identifiant et mot de passe.
+- Distinction des roles etudiant et administration.
+- L'espace d'administration est protege.",Medium,3,Sprint 2,laouratoudbah@gmail.com,Authentification et securite,commun
+Task,,[S6.1] Tests et corrections,"Objectif : tester les parcours etudiant et administration, puis corriger les anomalies detectees.
+
+Criteres d'acceptation :
+- Les parcours principaux sont testes de bout en bout.
+- Les bugs bloquants sont corriges.",High,3,Sprint 2,sadjosidibe35@outlook.fr,"Qualite, tests et livraison",commun
+Task,,[S6.2] Documentation et preparation de la demonstration,"Objectif : finaliser la documentation du projet et preparer la demonstration finale.
+
+Criteres d'acceptation :
+- Une courte documentation / rapport est redigee.
+- Un scenario de demonstration des deux parcours est pret.",Medium,2,Sprint 2,sadjosidibe35@outlook.fr,"Qualite, tests et livraison",commun
