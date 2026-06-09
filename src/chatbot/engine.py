@@ -5,7 +5,17 @@ du parcours guidé. `reponse_pour(conversation)` calcule la réponse à
 renvoyer en fonction de l'état courant ; `traiter_message(conversation,
 action, texte)` fait avancer la conversation vers l'état suivant.
 """
+from reclamations.models import Reclamation
+
 from .models import Conversation
+
+
+def _options_categories():
+    """Construit la liste des 4 catégories à proposer à l'étudiant."""
+    return [
+        {'value': value, 'label': label}
+        for value, label in Reclamation.CATEGORIE_CHOICES
+    ]
 
 
 def reponse_pour(conversation):
@@ -26,9 +36,21 @@ def reponse_pour(conversation):
         }
 
     if etat == Conversation.ETAT_CATEGORIE_DEMANDEE:
-        # Détaillé en S2.2.
         return {
-            'message': 'Parcours de dépôt lancé. Quelle est la catégorie de votre réclamation ?',
+            'message': 'Dans quelle catégorie se situe votre réclamation ?',
+            'options': _options_categories(),
+        }
+
+    if etat == Conversation.ETAT_DESCRIPTION_DEMANDEE:
+        # Détaillé en S2.3.
+        categorie_label = dict(Reclamation.CATEGORIE_CHOICES).get(
+            conversation.contexte.get('categorie'), ''
+        )
+        return {
+            'message': (
+                f"Catégorie sélectionnée : {categorie_label}. "
+                'Pouvez-vous décrire votre problème ?'
+            ),
             'options': [],
         }
 
@@ -63,5 +85,18 @@ def traiter_message(conversation, action='', texte=''):
                 'options': reponse_pour(conversation)['options'],
             }
         conversation.save(update_fields=['etat', 'date_maj'])
+        return reponse_pour(conversation)
+
+    if etat == Conversation.ETAT_CATEGORIE_DEMANDEE:
+        categories_valides = {value for value, _ in Reclamation.CATEGORIE_CHOICES}
+        if action not in categories_valides:
+            return {
+                'message': 'Merci de choisir une catégorie parmi celles proposées.',
+                'options': _options_categories(),
+            }
+        conversation.contexte['categorie'] = action
+        conversation.etat = Conversation.ETAT_DESCRIPTION_DEMANDEE
+        conversation.save(update_fields=['etat', 'contexte', 'date_maj'])
+        return reponse_pour(conversation)
 
     return reponse_pour(conversation)
