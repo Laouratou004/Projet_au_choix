@@ -1,0 +1,6 @@
+[pyrefly]
+# Racine des sources Django
+source_paths = ["src"]
+
+# Dossiers à exclure de l'analyse
+exclude = ["venv", ".git", "src/**/migrations"]
