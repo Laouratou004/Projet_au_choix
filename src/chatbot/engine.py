@@ -14,6 +14,61 @@ from .models import Conversation
 
 # Mots-clés par catégorie (en minuscules, sans accents). Sert à la
 # suggestion automatique en S3.2 — bonus.
+# Questions complémentaires à poser après la description initiale.
+# Chaque question est un dict { key, question, exemple }. Les réponses sont
+# stockées dans Conversation.contexte['details'][key] puis concaténées à
+# la description finale de la Réclamation pour donner du contexte à l'admin.
+QUESTIONS_DETAILS = {
+    'notes': [
+        {'key': 'matiere',     'question': 'Quelle est la matière ou le cours concerné ?',           'exemple': 'ex. Algèbre linéaire'},
+        {'key': 'semestre',    'question': 'À quel semestre / année universitaire cela se rapporte-t-il ?', 'exemple': 'ex. Semestre 2, 2025-2026'},
+        {'key': 'enseignant',  'question': "Quel est le nom de l'enseignant (si vous le connaissez) ?", 'exemple': 'ex. M. Diallo (optionnel, tapez "ras")'},
+    ],
+    'scolarite': [
+        {'key': 'document',    'question': 'De quel document ou démarche s’agit-il exactement ?',    'exemple': 'ex. certificat de scolarité, attestation, carte étudiant'},
+        {'key': 'depuis_quand','question': 'Depuis quand attendez-vous une réponse ou la délivrance ?', 'exemple': 'ex. depuis 3 semaines'},
+    ],
+    'examens': [
+        {'key': 'examen',      'question': 'De quel examen s’agit-il ?',                              'exemple': 'ex. Examen final de Bases de données'},
+        {'key': 'date_examen', 'question': 'À quelle date est-il prévu (ou a-t-il eu lieu) ?',         'exemple': 'ex. 12/06/2026'},
+        {'key': 'justificatif','question': 'Avez-vous un justificatif à fournir ?',                   'exemple': 'ex. certificat médical / non'},
+    ],
+    'bourse': [
+        {'key': 'periode',     'question': 'Quelle période ou mois est concerné ?',                   'exemple': 'ex. Avril 2026'},
+        {'key': 'montant',     'question': 'Quel montant est attendu (si vous le savez) ?',           'exemple': 'ex. 350 000 GNF (optionnel, tapez "ras")'},
+        {'key': 'dossier',     'question': 'Avez-vous un numéro de dossier ou de contrat de bourse ?', 'exemple': 'ex. B-2025-1234 (optionnel)'},
+    ],
+}
+
+
+def _questions_pour(categorie):
+    return QUESTIONS_DETAILS.get(categorie, [])
+
+
+def _question_courante(conversation):
+    """Renvoie la question en cours (selon details_index) ou None si terminé."""
+    questions = _questions_pour(conversation.contexte.get('categorie'))
+    idx = conversation.contexte.get('details_index', 0)
+    if 0 <= idx < len(questions):
+        return questions[idx]
+    return None
+
+
+def _formatter_description_complete(conversation):
+    """Description initiale + détails formatés pour l'admin."""
+    desc = conversation.contexte.get('description', '')
+    details = conversation.contexte.get('details', {})
+    questions = _questions_pour(conversation.contexte.get('categorie'))
+    if not details:
+        return desc
+    lignes = [desc.strip(), '', '--- Précisions ---']
+    for q in questions:
+        rep = details.get(q['key'])
+        if rep:
+            lignes.append(f"• {q['question']} → {rep}")
+    return '\n'.join(lignes)
+
+
 MOTS_CLES_CATEGORIES = {
     Reclamation.CAT_NOTES: [
         'note', 'notes', 'moyenne', 'copie', 'correction', 'revision',
@@ -80,13 +135,14 @@ def _categorie_label(conversation):
 def _creer_reclamation(conversation):
     """Persiste la réclamation à partir du contexte de la conversation.
 
-    La référence finale (REC-AAAA-NNN) est attribuée automatiquement
-    par Reclamation.save() — cf. S2.4.
+    La description enregistrée inclut les précisions obtenues lors de
+    l'étape DETAILS_DEMANDES. La référence finale (REC-AAAA-NNN) est
+    attribuée automatiquement par Reclamation.save() — cf. S2.4.
     """
     reclamation = Reclamation.objects.create(
         etudiant=conversation.etudiant,
         categorie=conversation.contexte['categorie'],
-        description=conversation.contexte['description'],
+        description=_formatter_description_complete(conversation),
         statut=Reclamation.STATUT_SOUMISE,
     )
     conversation.contexte['reclamation_id'] = reclamation.pk
@@ -157,12 +213,37 @@ def reponse_pour(conversation):
             'options': [],
         }
 
+    if etat == Conversation.ETAT_DETAILS_DEMANDES:
+        question = _question_courante(conversation)
+        if question is None:
+            # Plus de question : on devrait être passé à RECAPITULATIF.
+            return {'message': 'Merci pour ces précisions.', 'options': []}
+        total = len(_questions_pour(conversation.contexte.get('categorie')))
+        idx = conversation.contexte.get('details_index', 0) + 1
+        return {
+            'message': (
+                f"Précision {idx}/{total} — {question['question']}\n"
+                f"({question['exemple']})"
+            ),
+            'options': [
+                {'value': 'passer', 'label': 'Passer cette question'},
+            ],
+        }
+
     if etat == Conversation.ETAT_RECAPITULATIF:
+        details = conversation.contexte.get('details', {})
+        questions = _questions_pour(conversation.contexte.get('categorie'))
+        lignes_details = ''
+        if details:
+            lignes_details = '\nPrécisions :\n' + '\n'.join(
+                f"  • {q['question']} → {details.get(q['key'], '(passé)')}" for q in questions
+            )
         return {
             'message': (
                 'Voici le récapitulatif de votre réclamation :\n'
                 f"• Catégorie : {_categorie_label(conversation)}\n"
-                f"• Description : {conversation.contexte.get('description', '')}\n\n"
+                f"• Description : {conversation.contexte.get('description', '')}"
+                f"{lignes_details}\n\n"
                 'Confirmez-vous le dépôt ?'
             ),
             'options': [
@@ -249,7 +330,12 @@ def traiter_message(conversation, action='', texte=''):
         suggestion = conversation.contexte.get('categorie_suggeree')
         if action == 'accepter' and suggestion:
             conversation.contexte['categorie'] = suggestion
-            conversation.etat = Conversation.ETAT_RECAPITULATIF
+            conversation.contexte.setdefault('details', {})
+            conversation.contexte['details_index'] = 0
+            if _questions_pour(suggestion):
+                conversation.etat = Conversation.ETAT_DETAILS_DEMANDES
+            else:
+                conversation.etat = Conversation.ETAT_RECAPITULATIF
             conversation.save(update_fields=['etat', 'contexte', 'date_maj'])
             return reponse_pour(conversation)
         if action == 'modifier' or not suggestion:
@@ -262,7 +348,12 @@ def traiter_message(conversation, action='', texte=''):
         categories_valides = {value for value, _ in Reclamation.CATEGORIE_CHOICES}
         if action in categories_valides:
             conversation.contexte['categorie'] = action
-            conversation.etat = Conversation.ETAT_RECAPITULATIF
+            conversation.contexte.setdefault('details', {})
+            conversation.contexte['details_index'] = 0
+            if _questions_pour(action):
+                conversation.etat = Conversation.ETAT_DETAILS_DEMANDES
+            else:
+                conversation.etat = Conversation.ETAT_RECAPITULATIF
             conversation.save(update_fields=['etat', 'contexte', 'date_maj'])
             return reponse_pour(conversation)
         return reponse_pour(conversation)
@@ -275,7 +366,37 @@ def traiter_message(conversation, action='', texte=''):
                 'options': [],
             }
         conversation.contexte['description'] = description
-        conversation.etat = Conversation.ETAT_RECAPITULATIF
+        conversation.contexte.setdefault('details', {})
+        conversation.contexte['details_index'] = 0
+        # Si la catégorie a des questions complémentaires, on les pose.
+        # Sinon (catégorie sans questions définies), on va direct au récap.
+        if _questions_pour(conversation.contexte.get('categorie')):
+            conversation.etat = Conversation.ETAT_DETAILS_DEMANDES
+        else:
+            conversation.etat = Conversation.ETAT_RECAPITULATIF
+        conversation.save(update_fields=['etat', 'contexte', 'date_maj'])
+        return reponse_pour(conversation)
+
+    if etat == Conversation.ETAT_DETAILS_DEMANDES:
+        question = _question_courante(conversation)
+        if question is None:
+            conversation.etat = Conversation.ETAT_RECAPITULATIF
+            conversation.save(update_fields=['etat', 'date_maj'])
+            return reponse_pour(conversation)
+        if action == 'passer':
+            reponse = '(passé)'
+        else:
+            reponse = (texte or '').strip()
+            if not reponse:
+                return {
+                    'message': "Merci de répondre, ou cliquez sur « Passer cette question ».",
+                    'options': [{'value': 'passer', 'label': 'Passer cette question'}],
+                }
+        conversation.contexte.setdefault('details', {})[question['key']] = reponse
+        conversation.contexte['details_index'] = conversation.contexte.get('details_index', 0) + 1
+        # Si plus de question : récap
+        if _question_courante(conversation) is None:
+            conversation.etat = Conversation.ETAT_RECAPITULATIF
         conversation.save(update_fields=['etat', 'contexte', 'date_maj'])
         return reponse_pour(conversation)
 

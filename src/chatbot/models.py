@@ -16,6 +16,7 @@ class Conversation(models.Model):
     ETAT_DESCRIPTION_POUR_SUGGESTION = 'description_pour_suggestion'
     ETAT_SUGGESTION_PROPOSEE = 'suggestion_proposee'
     ETAT_DESCRIPTION_DEMANDEE = 'description_demandee'
+    ETAT_DETAILS_DEMANDES = 'details_demandes'
     ETAT_RECAPITULATIF = 'recapitulatif'
     ETAT_SUIVI_REF_DEMANDEE = 'suivi_ref_demandee'
     ETAT_TERMINEE = 'terminee'
@@ -26,6 +27,7 @@ class Conversation(models.Model):
         (ETAT_DESCRIPTION_POUR_SUGGESTION, 'Description pour suggestion'),
         (ETAT_SUGGESTION_PROPOSEE, 'Suggestion proposée'),
         (ETAT_DESCRIPTION_DEMANDEE, 'Description demandée'),
+        (ETAT_DETAILS_DEMANDES, 'Précisions demandées'),
         (ETAT_RECAPITULATIF, 'Récapitulatif'),
         (ETAT_SUIVI_REF_DEMANDEE, 'Référence de suivi demandée'),
         (ETAT_TERMINEE, 'Terminée'),
