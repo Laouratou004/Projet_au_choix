@@ -1,11 +1,11 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}Chatbot — Espace étudiant{% endblock %}
+{% block title %}Espace étudiant — Réclamations{% endblock %}
 
 {% block extra_css %}
 <style>
   .chat-window {
-    height: 60vh;
+    height: 55vh;
     overflow-y: auto;
     background: #fff;
     border: 1px solid #dee2e6;
@@ -22,60 +22,117 @@
     white-space: pre-wrap;
     word-wrap: break-word;
   }
-  .bubble-bot {
-    background: #e9ecef;
-    color: #212529;
-    border-top-left-radius: .25rem;
-    align-self: flex-start;
-  }
-  .bubble-user {
-    background: #0d6efd;
-    color: #fff;
-    border-top-right-radius: .25rem;
-    align-self: flex-end;
-  }
-  .bubble-meta {
-    font-size: .75rem;
-    color: #6c757d;
-    margin-top: .25rem;
-  }
-  .options-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .5rem;
-    margin-top: .25rem;
-  }
-  .typing {
-    color: #6c757d;
-    font-style: italic;
-    font-size: .9rem;
-  }
+  .bubble-bot { background:#e9ecef; color:#212529; border-top-left-radius:.25rem; align-self:flex-start; }
+  .bubble-user { background:#0d6efd; color:#fff; border-top-right-radius:.25rem; align-self:flex-end; }
+  .options-row { display:flex; flex-wrap:wrap; gap:.5rem; }
+  .typing { color:#6c757d; font-style:italic; font-size:.9rem; }
+
+  .badge-statut-soumise     { background:#6c757d; }
+  .badge-statut-en_cours    { background:#0d6efd; }
+  .badge-statut-attente_info{ background:#ffc107; color:#000; }
+  .badge-statut-resolue     { background:#198754; }
+  .badge-statut-cloturee    { background:#343a40; }
+  .badge-etat-terminee      { background:#198754; }
+  .badge-etat-active        { background:#0d6efd; }
+  .clickable { cursor:pointer; }
+  .clickable:hover { background:#f8f9fa; }
+  .msg-bubble { background:#f1f3f5; padding:.6rem .9rem; border-radius:.5rem; margin-bottom:.5rem; }
+  .msg-bubble small { color:#6c757d; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
-  <div class="col-lg-9 mx-auto">
-    <div class="d-flex align-items-center mb-3">
-      <h2 class="m-0"><i class="bi bi-robot text-primary"></i> Chatbot des réclamations</h2>
+<h2 class="mb-3"><i class="bi bi-mortarboard-fill text-primary"></i> Espace étudiant</h2>
+
+<ul class="nav nav-tabs mb-3" id="onglets" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-chatbot" type="button">
+      <i class="bi bi-robot"></i> Chatbot
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-conversations" type="button">
+      <i class="bi bi-chat-square-text"></i> Mes conversations
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-reclamations" type="button">
+      <i class="bi bi-clipboard-data"></i> Mes réclamations
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <!-- Onglet Chatbot -->
+  <div class="tab-pane fade show active" id="tab-chatbot">
+    <div class="d-flex align-items-center mb-2">
+      <span id="indic-conv" class="text-muted small"></span>
       <button id="btn-reset" class="btn btn-outline-secondary btn-sm ms-auto">
         <i class="bi bi-arrow-clockwise"></i> Nouvelle conversation
       </button>
     </div>
-
     <div id="chat" class="chat-window mb-3"></div>
-
     <div id="zone-saisie" class="input-group" style="display:none;">
       <input type="text" id="input-texte" class="form-control" placeholder="Tapez votre message...">
-      <button id="btn-envoyer" class="btn btn-primary">
-        <i class="bi bi-send"></i> Envoyer
-      </button>
+      <button id="btn-envoyer" class="btn btn-primary"><i class="bi bi-send"></i> Envoyer</button>
     </div>
+  </div>
 
-    <p class="text-muted small mt-2">
-      <i class="bi bi-info-circle"></i>
-      Le chatbot vous guide pas à pas. Cliquez sur une option ou tapez votre réponse quand demandé.
-    </p>
+  <!-- Onglet Mes conversations -->
+  <div class="tab-pane fade" id="tab-conversations">
+    <div class="card shadow-sm">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Date</th>
+              <th>État</th>
+              <th>Catégorie</th>
+              <th>Référence</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="liste-conversations">
+            <tr><td colspan="5" class="text-center text-muted py-4">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Onglet Mes réclamations -->
+  <div class="tab-pane fade" id="tab-reclamations">
+    <div class="card shadow-sm">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Référence</th>
+              <th>Catégorie</th>
+              <th>Statut</th>
+              <th>Date dépôt</th>
+              <th>Dernière MAJ</th>
+            </tr>
+          </thead>
+          <tbody id="liste-reclamations">
+            <tr><td colspan="5" class="text-center text-muted py-4">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal détail réclamation -->
+<div class="modal fade" id="modal-reclamation" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Détail de la réclamation <span id="mr-ref"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="mr-body"></div>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -84,14 +141,25 @@
 <script>
 (() => {
   const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+
+  // ---------- Helpers ----------
+  function fmtDate(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  }
+  function escapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------- Chatbot ----------
   const chat = document.getElementById('chat');
   const zoneSaisie = document.getElementById('zone-saisie');
   const inputTexte = document.getElementById('input-texte');
   const btnEnvoyer = document.getElementById('btn-envoyer');
   const btnReset = document.getElementById('btn-reset');
+  const indicConv = document.getElementById('indic-conv');
 
   let conversationId = null;
-  let attendOptionUniquement = false;
 
   function ajouterBulle(texte, type) {
     const wrap = document.createElement('div');
@@ -101,7 +169,6 @@
     chat.scrollTop = chat.scrollHeight;
     return wrap;
   }
-
   function ajouterOptions(options) {
     if (!options || options.length === 0) return;
     const row = document.createElement('div');
@@ -120,82 +187,75 @@
     chat.appendChild(row);
     chat.scrollTop = chat.scrollHeight;
   }
-
   function ajouterIndicateur() {
     const el = document.createElement('div');
-    el.className = 'typing';
-    el.id = 'typing';
-    el.textContent = 'Le chatbot écrit…';
-    chat.appendChild(el);
-    chat.scrollTop = chat.scrollHeight;
+    el.className = 'typing'; el.id = 'typing'; el.textContent = 'Le chatbot écrit…';
+    chat.appendChild(el); chat.scrollTop = chat.scrollHeight;
   }
-
   function retirerIndicateur() {
-    const el = document.getElementById('typing');
-    if (el) el.remove();
+    const el = document.getElementById('typing'); if (el) el.remove();
   }
-
   function gererReponse(data) {
     retirerIndicateur();
     const bot = data.bot || {};
     if (bot.message) ajouterBulle(bot.message, 'bot');
     if (bot.options && bot.options.length > 0) {
       ajouterOptions(bot.options);
-      // Si options présentes, on cache la zone de saisie texte
-      attendOptionUniquement = true;
       zoneSaisie.style.display = 'none';
     } else {
-      // Sinon on attend du texte libre, ou conversation terminée
       const etat = data.conversation && data.conversation.etat;
       if (etat === 'terminee') {
         zoneSaisie.style.display = 'none';
-        attendOptionUniquement = true;
       } else {
         zoneSaisie.style.display = 'flex';
-        attendOptionUniquement = false;
-        inputTexte.value = '';
-        inputTexte.focus();
+        inputTexte.value = ''; inputTexte.focus();
       }
     }
   }
-
   async function demarrer() {
-    chat.innerHTML = '';
-    conversationId = null;
+    chat.innerHTML = ''; conversationId = null; indicConv.textContent = '';
     ajouterIndicateur();
     try {
       const resp = await fetch('/api/chatbot/start/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': CSRF,
-        },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
         credentials: 'same-origin',
       });
-      if (!resp.ok) throw new Error('Erreur démarrage : ' + resp.status);
+      if (!resp.ok) throw new Error(resp.status);
       const data = await resp.json();
       conversationId = data.conversation.id;
+      indicConv.textContent = `Conversation #${conversationId}`;
       gererReponse(data);
     } catch (e) {
       retirerIndicateur();
-      ajouterBulle('Impossible de démarrer la conversation. Vérifiez que vous êtes bien connecté en tant qu\'étudiant.', 'bot');
+      ajouterBulle('Impossible de démarrer la conversation.', 'bot');
     }
   }
-
+  async function reprendre(id) {
+    chat.innerHTML = ''; conversationId = id; indicConv.textContent = `Conversation #${id} (reprise)`;
+    ajouterIndicateur();
+    try {
+      const resp = await fetch(`/api/chatbot/${id}/`, { credentials: 'same-origin' });
+      if (!resp.ok) throw new Error(resp.status);
+      const data = await resp.json();
+      ajouterBulle('— Reprise de la conversation —', 'bot');
+      gererReponse(data);
+    } catch (e) {
+      retirerIndicateur();
+      ajouterBulle('Impossible de reprendre cette conversation.', 'bot');
+    }
+  }
   async function envoyerMessage(payload) {
     if (!conversationId) return;
     ajouterIndicateur();
     try {
       const resp = await fetch(`/api/chatbot/${conversationId}/message/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': CSRF,
-        },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
         credentials: 'same-origin',
         body: JSON.stringify(payload),
       });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      if (!resp.ok) throw new Error(resp.status);
       const data = await resp.json();
       gererReponse(data);
     } catch (e) {
@@ -203,25 +263,123 @@
       ajouterBulle('Erreur réseau, réessayez.', 'bot');
     }
   }
-
   btnEnvoyer.addEventListener('click', () => {
-    const texte = inputTexte.value.trim();
-    if (!texte) return;
-    ajouterBulle(texte, 'user');
-    inputTexte.value = '';
-    envoyerMessage({ texte });
+    const texte = inputTexte.value.trim(); if (!texte) return;
+    ajouterBulle(texte, 'user'); inputTexte.value = ''; envoyerMessage({ texte });
   });
-
   inputTexte.addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      btnEnvoyer.click();
-    }
+    if (e.key === 'Enter') { e.preventDefault(); btnEnvoyer.click(); }
   });
-
   btnReset.addEventListener('click', demarrer);
 
-  // Lance la conversation au chargement
+  // ---------- Mes conversations ----------
+  async function chargerConversations() {
+    const tbody = document.getElementById('liste-conversations');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Chargement…</td></tr>';
+    try {
+      const resp = await fetch('/api/chatbot/conversations/', { credentials:'same-origin' });
+      const data = await resp.json();
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Aucune conversation pour le moment.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.map(c => {
+        const terminee = c.etat === 'terminee';
+        const badge = terminee
+          ? `<span class="badge badge-etat-terminee">Terminée</span>`
+          : `<span class="badge badge-etat-active">En cours — ${escapeHtml(c.etat_display)}</span>`;
+        const action = terminee
+          ? `<button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-check2"></i> Clôturée</button>`
+          : `<button class="btn btn-sm btn-primary" data-reprendre="${c.id}"><i class="bi bi-play-fill"></i> Reprendre</button>`;
+        return `
+          <tr>
+            <td>${fmtDate(c.date_creation)}</td>
+            <td>${badge}</td>
+            <td>${escapeHtml(c.categorie || '—')}</td>
+            <td><code>${c.reference || '—'}</code></td>
+            <td>${action}</td>
+          </tr>`;
+      }).join('');
+      Array.from(tbody.querySelectorAll('[data-reprendre]')).forEach(b => {
+        b.addEventListener('click', () => {
+          const id = parseInt(b.dataset.reprendre, 10);
+          // bascule onglet chatbot
+          new bootstrap.Tab(document.querySelector('[data-bs-target="#tab-chatbot"]')).show();
+          reprendre(id);
+        });
+      });
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">Erreur de chargement.</td></tr>';
+    }
+  }
+
+  // ---------- Mes réclamations ----------
+  let reclamationsCache = [];
+  const modalReclamation = new bootstrap.Modal(document.getElementById('modal-reclamation'));
+  async function chargerReclamations() {
+    const tbody = document.getElementById('liste-reclamations');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Chargement…</td></tr>';
+    try {
+      const resp = await fetch('/api/reclamations/mes-reclamations/', { credentials:'same-origin' });
+      const data = await resp.json();
+      reclamationsCache = data;
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Vous n\'avez pas encore déposé de réclamation.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.map(r => `
+        <tr class="clickable" data-id="${r.id}">
+          <td><code>${r.reference}</code></td>
+          <td>${escapeHtml(r.categorie_display)}</td>
+          <td><span class="badge badge-statut-${r.statut}">${escapeHtml(r.statut_display)}</span></td>
+          <td>${fmtDate(r.date_creation)}</td>
+          <td>${fmtDate(r.date_maj)}</td>
+        </tr>`).join('');
+      Array.from(tbody.querySelectorAll('tr.clickable')).forEach(tr => {
+        tr.addEventListener('click', () => ouvrirReclamation(parseInt(tr.dataset.id, 10)));
+      });
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">Erreur de chargement.</td></tr>';
+    }
+  }
+  function ouvrirReclamation(id) {
+    const r = reclamationsCache.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('mr-ref').innerHTML = `<code>${r.reference}</code>`;
+    const messagesHtml = (r.messages || []).map(m => `
+      <div class="msg-bubble">
+        <div>${escapeHtml(m.contenu)}</div>
+        <small>— ${escapeHtml(m.auteur_username)}, le ${fmtDate(m.date)}</small>
+      </div>`).join('') || '<em class="text-muted">Pas encore de réponse de l\'administration.</em>';
+    document.getElementById('mr-body').innerHTML = `
+      <dl class="row">
+        <dt class="col-sm-3">Catégorie</dt>
+        <dd class="col-sm-9">${escapeHtml(r.categorie_display)}</dd>
+        <dt class="col-sm-3">Statut</dt>
+        <dd class="col-sm-9"><span class="badge badge-statut-${r.statut}">${escapeHtml(r.statut_display)}</span></dd>
+        <dt class="col-sm-3">Description</dt>
+        <dd class="col-sm-9">${escapeHtml(r.description)}</dd>
+        <dt class="col-sm-3">Date dépôt</dt>
+        <dd class="col-sm-9">${fmtDate(r.date_creation)}</dd>
+        <dt class="col-sm-3">Dernière MAJ</dt>
+        <dd class="col-sm-9">${fmtDate(r.date_maj)}</dd>
+      </dl>
+      <hr>
+      <h6><i class="bi bi-chat-left-text"></i> Réponses de l'administration</h6>
+      <div>${messagesHtml}</div>`;
+    modalReclamation.show();
+  }
+
+  // Recharger les listes au changement d'onglet
+  document.querySelectorAll('#onglets button').forEach(btn => {
+    btn.addEventListener('shown.bs.tab', e => {
+      const target = e.target.dataset.bsTarget;
+      if (target === '#tab-conversations') chargerConversations();
+      else if (target === '#tab-reclamations') chargerReclamations();
+    });
+  });
+
+  // Démarre la conversation au chargement
   demarrer();
 })();
 </script>

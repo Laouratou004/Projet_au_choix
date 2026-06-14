@@ -4,6 +4,7 @@ from django.urls import path
 
 from .views import (
     DashboardView,
+    MesReclamationsView,
     ReclamationDetailView,
     ReclamationListView,
     ReclamationReponseView,
@@ -11,7 +12,9 @@ from .views import (
 )
 
 urlpatterns = [
-    # [S4.1] + [S4.2] Liste + filtres
+    # Espace étudiant : liste de mes réclamations
+    path('mes-reclamations/', MesReclamationsView.as_view(), name='mes-reclamations'),
+    # [S4.1] + [S4.2] Liste + filtres (admin)
     path('', ReclamationListView.as_view(), name='reclamation-list'),
     # [S4.3] Détail
     path('<int:pk>/', ReclamationDetailView.as_view(), name='reclamation-detail'),

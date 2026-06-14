@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from users.permissions import IsAdmin
+from users.permissions import IsAdmin, IsEtudiant
 
 from .models import Message, Reclamation
 from .serializers import (
@@ -16,6 +16,25 @@ from .serializers import (
     ReponseSerializer,
     StatutUpdateSerializer,
 )
+
+
+class MesReclamationsView(APIView):
+    """Liste les réclamations déposées par l'étudiant connecté.
+
+    Utilisée par l'onglet « Mes réclamations » de l'espace étudiant
+    pour suivre l'état d'avancement de chaque dossier.
+    """
+
+    permission_classes = [IsAuthenticated, IsEtudiant]
+
+    def get(self, request):
+        qs = (
+            Reclamation.objects
+            .filter(etudiant=request.user)
+            .prefetch_related('messages__auteur')
+            .order_by('-date_creation')
+        )
+        return Response(ReclamationDetailSerializer(qs, many=True).data)
 
 
 class ReclamationListView(APIView):
