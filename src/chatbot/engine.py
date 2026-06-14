@@ -5,8 +5,6 @@ du parcours guidé. `reponse_pour(conversation)` calcule la réponse à
 renvoyer en fonction de l'état courant ; `traiter_message(conversation,
 action, texte)` fait avancer la conversation vers l'état suivant.
 """
-import uuid
-
 from reclamations.models import Reclamation
 
 from .models import Conversation
@@ -26,22 +24,20 @@ def _categorie_label(conversation):
     )
 
 
-def _generer_reference_temporaire():
-    """Référence unique posée à la création (le format final REC-AAAA-NNN
-    sera attribué en S2.4)."""
-    return f"TMP-{uuid.uuid4().hex[:10].upper()}"
-
-
 def _creer_reclamation(conversation):
-    """Persiste la réclamation à partir du contexte de la conversation."""
+    """Persiste la réclamation à partir du contexte de la conversation.
+
+    La référence finale (REC-AAAA-NNN) est attribuée automatiquement
+    par Reclamation.save() — cf. S2.4.
+    """
     reclamation = Reclamation.objects.create(
         etudiant=conversation.etudiant,
         categorie=conversation.contexte['categorie'],
         description=conversation.contexte['description'],
         statut=Reclamation.STATUT_SOUMISE,
-        reference=_generer_reference_temporaire(),
     )
     conversation.contexte['reclamation_id'] = reclamation.pk
+    conversation.contexte['reference'] = reclamation.reference
     return reclamation
 
 
@@ -99,14 +95,16 @@ def reponse_pour(conversation):
         }
 
     if etat == Conversation.ETAT_TERMINEE:
-        reclamation_id = conversation.contexte.get('reclamation_id')
-        if reclamation_id:
+        reference = conversation.contexte.get('reference')
+        if reference:
             return {
                 'message': (
-                    'Votre réclamation a bien été enregistrée avec le statut « Soumise ». '
-                    "L'administration la prendra en charge prochainement. À bientôt !"
+                    'Votre réclamation a bien été enregistrée avec le statut « Soumise ».\n'
+                    f"Votre référence de suivi : {reference}\n"
+                    "Conservez-la pour consulter l'avancement de votre dossier. À bientôt !"
                 ),
                 'options': [],
+                'reference': reference,
             }
         return {'message': 'Conversation terminée. À bientôt !', 'options': []}
 
