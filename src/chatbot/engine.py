@@ -173,4 +173,43 @@ def traiter_message(conversation, action='', texte=''):
             'options': reponse_pour(conversation)['options'],
         }
 
+    if etat == Conversation.ETAT_SUIVI_REF_DEMANDEE:
+        reference = (texte or '').strip().upper()
+        if not reference:
+            return {
+                'message': 'Merci de saisir une référence (ex. REC-2026-001).',
+                'options': [],
+            }
+        reclamation = Reclamation.objects.filter(
+            reference=reference,
+            etudiant=conversation.etudiant,
+        ).first()
+        if reclamation is None:
+            return {
+                'message': (
+                    f"Aucune réclamation trouvée pour la référence « {reference} ». "
+                    'Vérifiez la référence et réessayez.'
+                ),
+                'options': [],
+            }
+        conversation.contexte['reference'] = reclamation.reference
+        conversation.contexte['reclamation_id'] = reclamation.pk
+        conversation.etat = Conversation.ETAT_TERMINEE
+        conversation.save(update_fields=['etat', 'contexte', 'date_maj'])
+        return {
+            'message': (
+                f"Voici l'état de votre réclamation {reclamation.reference} :\n"
+                f"• Catégorie : {reclamation.get_categorie_display()}\n"
+                f"• Statut : {reclamation.get_statut_display()}\n"
+                f"• Dernière mise à jour : {reclamation.date_maj:%d/%m/%Y à %H:%M}"
+            ),
+            'options': [],
+            'reclamation': {
+                'reference': reclamation.reference,
+                'categorie': reclamation.categorie,
+                'statut': reclamation.statut,
+                'date_maj': reclamation.date_maj.isoformat(),
+            },
+        }
+
     return reponse_pour(conversation)
