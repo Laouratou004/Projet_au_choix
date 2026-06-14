@@ -5,17 +5,70 @@ du parcours guidé. `reponse_pour(conversation)` calcule la réponse à
 renvoyer en fonction de l'état courant ; `traiter_message(conversation,
 action, texte)` fait avancer la conversation vers l'état suivant.
 """
+import unicodedata
+
 from reclamations.models import Reclamation
 
 from .models import Conversation
 
 
-def _options_categories():
-    """Construit la liste des 4 catégories à proposer à l'étudiant."""
-    return [
+# Mots-clés par catégorie (en minuscules, sans accents). Sert à la
+# suggestion automatique en S3.2 — bonus.
+MOTS_CLES_CATEGORIES = {
+    Reclamation.CAT_NOTES: [
+        'note', 'notes', 'moyenne', 'copie', 'correction', 'revision',
+        'releve de notes', 'calcul', 'saisie',
+    ],
+    Reclamation.CAT_SCOLARITE: [
+        'scolarite', 'releve', 'certificat', 'inscription', 'attestation',
+        'informations personnelles', 'dossier', 'carte etudiant',
+    ],
+    Reclamation.CAT_EXAMENS: [
+        'examen', 'examens', 'planning', 'conflit', 'absence', 'rattrapage',
+        'salle', 'convocation', 'epreuve',
+    ],
+    Reclamation.CAT_BOURSE: [
+        'bourse', 'versee', 'verser', 'paiement', 'frais', 'scolarite payee',
+        'allocation', 'aide financiere',
+    ],
+}
+
+
+def _normaliser(texte):
+    """Minuscules + suppression des accents pour matcher les mots-clés."""
+    sans_accent = unicodedata.normalize('NFD', texte)
+    sans_accent = ''.join(c for c in sans_accent if unicodedata.category(c) != 'Mn')
+    return sans_accent.lower()
+
+
+def suggerer_categorie(description):
+    """Devine la catégorie la plus probable à partir de la description.
+
+    Renvoie un tuple (categorie, nombre_de_matches). Si aucun mot-clé
+    n'est trouvé, renvoie (None, 0).
+    """
+    texte = _normaliser(description)
+    meilleur = (None, 0)
+    for categorie, mots in MOTS_CLES_CATEGORIES.items():
+        score = sum(1 for mot in mots if mot in texte)
+        if score > meilleur[1]:
+            meilleur = (categorie, score)
+    return meilleur
+
+
+def _options_categories(avec_suggestion=False):
+    """Construit la liste des 4 catégories à proposer à l'étudiant.
+
+    Si `avec_suggestion=True`, ajoute une option 'suggerer' pour
+    laisser le bot proposer une catégorie d'après la description.
+    """
+    options = [
         {'value': value, 'label': label}
         for value, label in Reclamation.CATEGORIE_CHOICES
     ]
+    if avec_suggestion:
+        options.append({'value': 'suggerer', 'label': 'Pas sûr, suggérez-moi'})
+    return options
 
 
 def _categorie_label(conversation):
@@ -61,6 +114,37 @@ def reponse_pour(conversation):
     if etat == Conversation.ETAT_CATEGORIE_DEMANDEE:
         return {
             'message': 'Dans quelle catégorie se situe votre réclamation ?',
+            'options': _options_categories(avec_suggestion=True),
+        }
+
+    if etat == Conversation.ETAT_DESCRIPTION_POUR_SUGGESTION:
+        return {
+            'message': (
+                'Pas de souci, décrivez votre problème et je vous suggérerai '
+                'une catégorie adaptée.'
+            ),
+            'options': [],
+        }
+
+    if etat == Conversation.ETAT_SUGGESTION_PROPOSEE:
+        suggestion = conversation.contexte.get('categorie_suggeree')
+        label = dict(Reclamation.CATEGORIE_CHOICES).get(suggestion, '')
+        if suggestion:
+            return {
+                'message': (
+                    f"D'après votre description, la catégorie la plus probable est : "
+                    f"« {label} ». Souhaitez-vous l'accepter ou choisir une autre catégorie ?"
+                ),
+                'options': [
+                    {'value': 'accepter', 'label': f'Accepter ({label})'},
+                    {'value': 'modifier', 'label': 'Choisir une autre catégorie'},
+                ],
+            }
+        return {
+            'message': (
+                "Je n'ai pas pu deviner la catégorie automatiquement. "
+                'Pouvez-vous la sélectionner manuellement ?'
+            ),
             'options': _options_categories(),
         }
 
@@ -132,15 +216,55 @@ def traiter_message(conversation, action='', texte=''):
         return reponse_pour(conversation)
 
     if etat == Conversation.ETAT_CATEGORIE_DEMANDEE:
+        if action == 'suggerer':
+            conversation.etat = Conversation.ETAT_DESCRIPTION_POUR_SUGGESTION
+            conversation.save(update_fields=['etat', 'date_maj'])
+            return reponse_pour(conversation)
         categories_valides = {value for value, _ in Reclamation.CATEGORIE_CHOICES}
         if action not in categories_valides:
             return {
                 'message': 'Merci de choisir une catégorie parmi celles proposées.',
-                'options': _options_categories(),
+                'options': _options_categories(avec_suggestion=True),
             }
         conversation.contexte['categorie'] = action
         conversation.etat = Conversation.ETAT_DESCRIPTION_DEMANDEE
         conversation.save(update_fields=['etat', 'contexte', 'date_maj'])
+        return reponse_pour(conversation)
+
+    if etat == Conversation.ETAT_DESCRIPTION_POUR_SUGGESTION:
+        description = (texte or '').strip()
+        if len(description) < 5:
+            return {
+                'message': "Merci de décrire votre problème en quelques mots (au moins 5 caractères).",
+                'options': [],
+            }
+        suggestion, _score = suggerer_categorie(description)
+        conversation.contexte['description'] = description
+        conversation.contexte['categorie_suggeree'] = suggestion
+        conversation.etat = Conversation.ETAT_SUGGESTION_PROPOSEE
+        conversation.save(update_fields=['etat', 'contexte', 'date_maj'])
+        return reponse_pour(conversation)
+
+    if etat == Conversation.ETAT_SUGGESTION_PROPOSEE:
+        suggestion = conversation.contexte.get('categorie_suggeree')
+        if action == 'accepter' and suggestion:
+            conversation.contexte['categorie'] = suggestion
+            conversation.etat = Conversation.ETAT_RECAPITULATIF
+            conversation.save(update_fields=['etat', 'contexte', 'date_maj'])
+            return reponse_pour(conversation)
+        if action == 'modifier' or not suggestion:
+            conversation.etat = Conversation.ETAT_CATEGORIE_DEMANDEE
+            conversation.save(update_fields=['etat', 'date_maj'])
+            return {
+                'message': 'Choisissez la catégorie qui vous semble la plus adaptée.',
+                'options': _options_categories(),
+            }
+        categories_valides = {value for value, _ in Reclamation.CATEGORIE_CHOICES}
+        if action in categories_valides:
+            conversation.contexte['categorie'] = action
+            conversation.etat = Conversation.ETAT_RECAPITULATIF
+            conversation.save(update_fields=['etat', 'contexte', 'date_maj'])
+            return reponse_pour(conversation)
         return reponse_pour(conversation)
 
     if etat == Conversation.ETAT_DESCRIPTION_DEMANDEE:

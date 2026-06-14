@@ -13,6 +13,8 @@ class Conversation(models.Model):
     ETAT_ACCUEIL = 'accueil'
     ETAT_CHOIX_ACTION = 'choix_action'
     ETAT_CATEGORIE_DEMANDEE = 'categorie_demandee'
+    ETAT_DESCRIPTION_POUR_SUGGESTION = 'description_pour_suggestion'
+    ETAT_SUGGESTION_PROPOSEE = 'suggestion_proposee'
     ETAT_DESCRIPTION_DEMANDEE = 'description_demandee'
     ETAT_RECAPITULATIF = 'recapitulatif'
     ETAT_SUIVI_REF_DEMANDEE = 'suivi_ref_demandee'
@@ -21,6 +23,8 @@ class Conversation(models.Model):
         (ETAT_ACCUEIL, 'Accueil'),
         (ETAT_CHOIX_ACTION, "Choix de l'action"),
         (ETAT_CATEGORIE_DEMANDEE, 'Catégorie demandée'),
+        (ETAT_DESCRIPTION_POUR_SUGGESTION, 'Description pour suggestion'),
+        (ETAT_SUGGESTION_PROPOSEE, 'Suggestion proposée'),
         (ETAT_DESCRIPTION_DEMANDEE, 'Description demandée'),
         (ETAT_RECAPITULATIF, 'Récapitulatif'),
         (ETAT_SUIVI_REF_DEMANDEE, 'Référence de suivi demandée'),
