@@ -22,7 +22,7 @@ QUESTIONS_DETAILS = {
     'notes': [
         {'key': 'matiere',     'question': 'Quelle est la matière ou le cours concerné ?',           'exemple': 'ex. Algèbre linéaire'},
         {'key': 'semestre',    'question': 'À quel semestre / année universitaire cela se rapporte-t-il ?', 'exemple': 'ex. Semestre 2, 2025-2026'},
-        {'key': 'enseignant',  'question': "Quel est le nom de l'enseignant (si vous le connaissez) ?", 'exemple': 'ex. M. Diallo (optionnel, tapez "ras")'},
+        {'key': 'enseignant',  'question': "Quel est le nom de l'enseignant en charge ?",            'exemple': 'ex. M. Diallo'},
     ],
     'scolarite': [
         {'key': 'document',    'question': 'De quel document ou démarche s’agit-il exactement ?',    'exemple': 'ex. certificat de scolarité, attestation, carte étudiant'},
@@ -31,12 +31,12 @@ QUESTIONS_DETAILS = {
     'examens': [
         {'key': 'examen',      'question': 'De quel examen s’agit-il ?',                              'exemple': 'ex. Examen final de Bases de données'},
         {'key': 'date_examen', 'question': 'À quelle date est-il prévu (ou a-t-il eu lieu) ?',         'exemple': 'ex. 12/06/2026'},
-        {'key': 'justificatif','question': 'Avez-vous un justificatif à fournir ?',                   'exemple': 'ex. certificat médical / non'},
+        {'key': 'justificatif','question': 'Avez-vous un justificatif à fournir ? Si oui, lequel ?',  'exemple': 'ex. certificat médical, ou "non"'},
     ],
     'bourse': [
         {'key': 'periode',     'question': 'Quelle période ou mois est concerné ?',                   'exemple': 'ex. Avril 2026'},
-        {'key': 'montant',     'question': 'Quel montant est attendu (si vous le savez) ?',           'exemple': 'ex. 350 000 GNF (optionnel, tapez "ras")'},
-        {'key': 'dossier',     'question': 'Avez-vous un numéro de dossier ou de contrat de bourse ?', 'exemple': 'ex. B-2025-1234 (optionnel)'},
+        {'key': 'montant',     'question': 'Quel est le montant attendu ?',                           'exemple': 'ex. 350 000 GNF'},
+        {'key': 'dossier',     'question': 'Quel est votre numéro de dossier ou de contrat de bourse ?', 'exemple': 'ex. B-2025-1234'},
     ],
 }
 
@@ -225,9 +225,7 @@ def reponse_pour(conversation):
                 f"Précision {idx}/{total} — {question['question']}\n"
                 f"({question['exemple']})"
             ),
-            'options': [
-                {'value': 'passer', 'label': 'Passer cette question'},
-            ],
+            'options': [],
         }
 
     if etat == Conversation.ETAT_RECAPITULATIF:
@@ -383,15 +381,15 @@ def traiter_message(conversation, action='', texte=''):
             conversation.etat = Conversation.ETAT_RECAPITULATIF
             conversation.save(update_fields=['etat', 'date_maj'])
             return reponse_pour(conversation)
-        if action == 'passer':
-            reponse = '(passé)'
-        else:
-            reponse = (texte or '').strip()
-            if not reponse:
-                return {
-                    'message': "Merci de répondre, ou cliquez sur « Passer cette question ».",
-                    'options': [{'value': 'passer', 'label': 'Passer cette question'}],
-                }
+        reponse = (texte or '').strip()
+        if len(reponse) < 2:
+            return {
+                'message': (
+                    "Cette précision est nécessaire pour traiter votre réclamation. "
+                    "Merci de répondre (au moins 2 caractères)."
+                ),
+                'options': [],
+            }
         conversation.contexte.setdefault('details', {})[question['key']] = reponse
         conversation.contexte['details_index'] = conversation.contexte.get('details_index', 0) + 1
         # Si plus de question : récap
