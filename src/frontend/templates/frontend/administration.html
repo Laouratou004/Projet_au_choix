@@ -18,7 +18,12 @@
 {% endblock %}
 
 {% block content %}
-<h2 class="mb-4"><i class="bi bi-speedometer2 text-primary"></i> Tableau de bord administration</h2>
+<div class="d-flex align-items-center mb-4">
+  <h2 class="m-0"><i class="bi bi-speedometer2 text-primary"></i> Tableau de bord administration</h2>
+  <a href="{% url 'frontend:creer_etudiant' %}" class="btn btn-primary ms-auto">
+    <i class="bi bi-person-plus"></i> Créer un étudiant
+  </a>
+</div>
 
 <!-- Statistiques -->
 <div class="row g-3 mb-4" id="stats">

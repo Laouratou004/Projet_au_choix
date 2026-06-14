@@ -3,11 +3,15 @@ from django import forms
 from users.models import User
 
 
-class InscriptionForm(forms.ModelForm):
-    """Formulaire d'inscription d'un étudiant."""
+class CreationEtudiantForm(forms.ModelForm):
+    """Formulaire utilisé par les admins de l'université pour créer un étudiant.
+
+    Plus accessible publiquement : l'inscription libre a été retirée pour
+    n'autoriser que les comptes créés par l'administration.
+    """
 
     password = forms.CharField(
-        label='Mot de passe',
+        label='Mot de passe initial',
         widget=forms.PasswordInput(attrs={'class': 'form-control'}),
         min_length=6,
     )
