@@ -56,3 +56,11 @@ def etudiant(request):
     if request.user.is_staff or getattr(request.user, 'est_admin', False):
         return redirect('/administration/')
     return render(request, 'frontend/etudiant.html')
+
+
+@login_required
+def administration(request):
+    """Tableau de bord administration. Réservé aux admins (role=admin ou is_staff)."""
+    if not (request.user.is_staff or getattr(request.user, 'est_admin', False)):
+        return redirect('/etudiant/')
+    return render(request, 'frontend/administration.html')

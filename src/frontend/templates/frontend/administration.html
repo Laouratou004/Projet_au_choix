@@ -1,0 +1,316 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Tableau de bord — Administration{% endblock %}
+
+{% block extra_css %}
+<style>
+  .stat-card { border-left: 4px solid #0d6efd; }
+  .badge-statut-soumise     { background:#6c757d; }
+  .badge-statut-en_cours    { background:#0d6efd; }
+  .badge-statut-attente_info{ background:#ffc107; color:#000; }
+  .badge-statut-resolue     { background:#198754; }
+  .badge-statut-cloturee    { background:#343a40; }
+  .reclamation-row { cursor:pointer; }
+  .reclamation-row:hover { background:#f8f9fa; }
+  .msg-bubble { background:#f1f3f5; padding:.6rem .9rem; border-radius:.5rem; margin-bottom:.5rem; }
+  .msg-bubble small { color:#6c757d; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-speedometer2 text-primary"></i> Tableau de bord administration</h2>
+
+<!-- Statistiques -->
+<div class="row g-3 mb-4" id="stats">
+  <div class="col-md-3">
+    <div class="card shadow-sm stat-card">
+      <div class="card-body">
+        <div class="text-muted small">Total</div>
+        <div class="h3 mb-0" id="stat-total">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-9">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6">
+            <h6 class="text-muted">Par statut</h6>
+            <div id="stat-statut">—</div>
+          </div>
+          <div class="col-md-6">
+            <h6 class="text-muted">Par catégorie</h6>
+            <div id="stat-categorie">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filtres -->
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small">Catégorie</label>
+        <select id="f-categorie" class="form-select">
+          <option value="">Toutes</option>
+          <option value="notes">Notes</option>
+          <option value="scolarite">Scolarité</option>
+          <option value="examens">Examens</option>
+          <option value="bourse">Bourse</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small">Statut</label>
+        <select id="f-statut" class="form-select">
+          <option value="">Tous</option>
+          <option value="soumise">Soumise</option>
+          <option value="en_cours">En cours</option>
+          <option value="attente_info">En attente d'info</option>
+          <option value="resolue">Résolue</option>
+          <option value="cloturee">Clôturée</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <button id="btn-rafraichir" class="btn btn-outline-primary w-100">
+          <i class="bi bi-arrow-clockwise"></i> Rafraîchir
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tableau des réclamations -->
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Référence</th>
+          <th>Catégorie</th>
+          <th>Statut</th>
+          <th>Étudiant</th>
+          <th>Date dépôt</th>
+          <th>Dernière MAJ</th>
+        </tr>
+      </thead>
+      <tbody id="liste"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal détail -->
+<div class="modal fade" id="modal-detail" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Détail de la réclamation <span id="m-ref"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="m-body"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(() => {
+  const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+  const liste = document.getElementById('liste');
+  const fCat = document.getElementById('f-categorie');
+  const fStat = document.getElementById('f-statut');
+  const btnRafraichir = document.getElementById('btn-rafraichir');
+  const modalEl = document.getElementById('modal-detail');
+  const modal = new bootstrap.Modal(modalEl);
+  const mRef = document.getElementById('m-ref');
+  const mBody = document.getElementById('m-body');
+
+  const STATUTS = [
+    ['soumise', 'Soumise'],
+    ['en_cours', 'En cours'],
+    ['attente_info', "En attente d'info"],
+    ['resolue', 'Résolue'],
+    ['cloturee', 'Clôturée'],
+  ];
+
+  function formatDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function badgeStatut(statut, label) {
+    return `<span class="badge badge-statut-${statut}">${label}</span>`;
+  }
+
+  async function chargerStats() {
+    try {
+      const resp = await fetch('/api/reclamations/dashboard/', { credentials: 'same-origin' });
+      const data = await resp.json();
+      document.getElementById('stat-total').textContent = data.total;
+      document.getElementById('stat-statut').innerHTML =
+        data.par_statut.map(r => `<div>${badgeStatut(r.statut, r.label)} <strong>${r.count}</strong></div>`).join('') || '<em>aucune</em>';
+      document.getElementById('stat-categorie').innerHTML =
+        data.par_categorie.map(r => `<div>${r.label} : <strong>${r.count}</strong></div>`).join('') || '<em>aucune</em>';
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function chargerListe() {
+    const params = new URLSearchParams();
+    if (fCat.value) params.set('categorie', fCat.value);
+    if (fStat.value) params.set('statut', fStat.value);
+    const url = '/api/reclamations/' + (params.toString() ? '?' + params : '');
+    liste.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Chargement…</td></tr>';
+    try {
+      const resp = await fetch(url, { credentials: 'same-origin' });
+      const data = await resp.json();
+      if (!data.length) {
+        liste.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Aucune réclamation</td></tr>';
+        return;
+      }
+      liste.innerHTML = data.map(r => `
+        <tr class="reclamation-row" data-id="${r.id}">
+          <td><code>${r.reference || '—'}</code></td>
+          <td>${r.categorie_display}</td>
+          <td>${badgeStatut(r.statut, r.statut_display)}</td>
+          <td>${r.etudiant_username}<br><small class="text-muted">${r.etudiant_email}</small></td>
+          <td>${formatDate(r.date_creation)}</td>
+          <td>${formatDate(r.date_maj)}</td>
+        </tr>
+      `).join('');
+      Array.from(liste.querySelectorAll('.reclamation-row')).forEach(tr => {
+        tr.addEventListener('click', () => ouvrirDetail(tr.dataset.id));
+      });
+    } catch (e) {
+      liste.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Erreur de chargement</td></tr>`;
+    }
+  }
+
+  async function ouvrirDetail(id) {
+    mRef.textContent = '';
+    mBody.innerHTML = '<div class="text-center text-muted py-4">Chargement…</div>';
+    modal.show();
+    try {
+      const resp = await fetch(`/api/reclamations/${id}/`, { credentials: 'same-origin' });
+      const r = await resp.json();
+      mRef.innerHTML = `<code>${r.reference}</code>`;
+      const messagesHtml = (r.messages || []).map(m => `
+        <div class="msg-bubble">
+          <div>${escapeHtml(m.contenu)}</div>
+          <small>— ${m.auteur_username}, le ${formatDate(m.date)}</small>
+        </div>
+      `).join('') || '<em class="text-muted">Aucun message pour le moment.</em>';
+
+      const statutOptions = STATUTS.map(([v, l]) =>
+        `<option value="${v}" ${v === r.statut ? 'selected' : ''}>${l}</option>`).join('');
+
+      mBody.innerHTML = `
+        <dl class="row">
+          <dt class="col-sm-3">Étudiant</dt>
+          <dd class="col-sm-9">${r.etudiant_username} <small class="text-muted">(${r.etudiant_email})</small></dd>
+          <dt class="col-sm-3">Catégorie</dt>
+          <dd class="col-sm-9">${r.categorie_display}</dd>
+          <dt class="col-sm-3">Statut actuel</dt>
+          <dd class="col-sm-9">${badgeStatut(r.statut, r.statut_display)}</dd>
+          <dt class="col-sm-3">Description</dt>
+          <dd class="col-sm-9">${escapeHtml(r.description)}</dd>
+          <dt class="col-sm-3">Date dépôt</dt>
+          <dd class="col-sm-9">${formatDate(r.date_creation)}</dd>
+        </dl>
+
+        <hr>
+        <h6><i class="bi bi-arrow-repeat"></i> Changer le statut</h6>
+        <form id="form-statut" class="row g-2 align-items-end mb-3">
+          <div class="col-md-8">
+            <select name="statut" class="form-select">${statutOptions}</select>
+          </div>
+          <div class="col-md-4">
+            <button class="btn btn-primary w-100" type="submit">
+              <i class="bi bi-check-circle"></i> Mettre à jour
+            </button>
+          </div>
+        </form>
+        <div id="alert-statut"></div>
+
+        <hr>
+        <h6><i class="bi bi-chat-left-text"></i> Échanges</h6>
+        <div id="messages">${messagesHtml}</div>
+
+        <hr>
+        <h6><i class="bi bi-reply"></i> Répondre à l'étudiant</h6>
+        <form id="form-reponse" class="mb-2">
+          <textarea name="contenu" class="form-control mb-2" rows="3" placeholder="Votre réponse…" required></textarea>
+          <button class="btn btn-success" type="submit">
+            <i class="bi bi-send"></i> Envoyer la réponse
+          </button>
+        </form>
+        <div id="alert-reponse"></div>
+      `;
+
+      // Form statut
+      document.getElementById('form-statut').addEventListener('submit', async e => {
+        e.preventDefault();
+        const statut = e.target.statut.value;
+        const alert = document.getElementById('alert-statut');
+        try {
+          const resp = await fetch(`/api/reclamations/${id}/statut/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            credentials: 'same-origin',
+            body: JSON.stringify({ statut }),
+          });
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          const data = await resp.json();
+          alert.innerHTML = `<div class="alert alert-success py-2 mb-2">✓ ${data.detail}</div>`;
+          chargerListe(); chargerStats();
+        } catch (err) {
+          alert.innerHTML = `<div class="alert alert-danger py-2 mb-2">Erreur lors de la mise à jour.</div>`;
+        }
+      });
+
+      // Form réponse
+      document.getElementById('form-reponse').addEventListener('submit', async e => {
+        e.preventDefault();
+        const contenu = e.target.contenu.value.trim();
+        const alert = document.getElementById('alert-reponse');
+        if (!contenu) return;
+        try {
+          const resp = await fetch(`/api/reclamations/${id}/reponse/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            credentials: 'same-origin',
+            body: JSON.stringify({ contenu }),
+          });
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          alert.innerHTML = `<div class="alert alert-success py-2 mb-2">✓ Réponse envoyée.</div>`;
+          e.target.reset();
+          ouvrirDetail(id); // recharge messages
+        } catch (err) {
+          alert.innerHTML = `<div class="alert alert-danger py-2 mb-2">Erreur lors de l'envoi.</div>`;
+        }
+      });
+    } catch (e) {
+      mBody.innerHTML = '<div class="alert alert-danger">Impossible de charger la réclamation.</div>';
+    }
+  }
+
+  function escapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  fCat.addEventListener('change', chargerListe);
+  fStat.addEventListener('change', chargerListe);
+  btnRafraichir.addEventListener('click', () => { chargerStats(); chargerListe(); });
+
+  chargerStats();
+  chargerListe();
+})();
+</script>
+{% endblock %}

@@ -4,6 +4,7 @@ from .views import (
     ConnexionView,
     DeconnexionView,
     accueil,
+    administration,
     etudiant,
     inscription,
 )
@@ -16,4 +17,5 @@ urlpatterns = [
     path('deconnexion/', DeconnexionView.as_view(), name='deconnexion'),
     path('inscription/', inscription, name='inscription'),
     path('etudiant/', etudiant, name='etudiant'),
+    path('administration/', administration, name='administration'),
 ]
