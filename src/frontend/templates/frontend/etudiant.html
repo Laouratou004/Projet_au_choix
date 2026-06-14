@@ -1,0 +1,228 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Chatbot — Espace étudiant{% endblock %}
+
+{% block extra_css %}
+<style>
+  .chat-window {
+    height: 60vh;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+  }
+  .bubble {
+    max-width: 75%;
+    padding: .75rem 1rem;
+    border-radius: 1rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .bubble-bot {
+    background: #e9ecef;
+    color: #212529;
+    border-top-left-radius: .25rem;
+    align-self: flex-start;
+  }
+  .bubble-user {
+    background: #0d6efd;
+    color: #fff;
+    border-top-right-radius: .25rem;
+    align-self: flex-end;
+  }
+  .bubble-meta {
+    font-size: .75rem;
+    color: #6c757d;
+    margin-top: .25rem;
+  }
+  .options-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-top: .25rem;
+  }
+  .typing {
+    color: #6c757d;
+    font-style: italic;
+    font-size: .9rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-9 mx-auto">
+    <div class="d-flex align-items-center mb-3">
+      <h2 class="m-0"><i class="bi bi-robot text-primary"></i> Chatbot des réclamations</h2>
+      <button id="btn-reset" class="btn btn-outline-secondary btn-sm ms-auto">
+        <i class="bi bi-arrow-clockwise"></i> Nouvelle conversation
+      </button>
+    </div>
+
+    <div id="chat" class="chat-window mb-3"></div>
+
+    <div id="zone-saisie" class="input-group" style="display:none;">
+      <input type="text" id="input-texte" class="form-control" placeholder="Tapez votre message...">
+      <button id="btn-envoyer" class="btn btn-primary">
+        <i class="bi bi-send"></i> Envoyer
+      </button>
+    </div>
+
+    <p class="text-muted small mt-2">
+      <i class="bi bi-info-circle"></i>
+      Le chatbot vous guide pas à pas. Cliquez sur une option ou tapez votre réponse quand demandé.
+    </p>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(() => {
+  const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+  const chat = document.getElementById('chat');
+  const zoneSaisie = document.getElementById('zone-saisie');
+  const inputTexte = document.getElementById('input-texte');
+  const btnEnvoyer = document.getElementById('btn-envoyer');
+  const btnReset = document.getElementById('btn-reset');
+
+  let conversationId = null;
+  let attendOptionUniquement = false;
+
+  function ajouterBulle(texte, type) {
+    const wrap = document.createElement('div');
+    wrap.className = `bubble bubble-${type}`;
+    wrap.textContent = texte;
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+    return wrap;
+  }
+
+  function ajouterOptions(options) {
+    if (!options || options.length === 0) return;
+    const row = document.createElement('div');
+    row.className = 'options-row';
+    options.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-outline-primary btn-sm';
+      btn.textContent = opt.label;
+      btn.addEventListener('click', () => {
+        ajouterBulle(opt.label, 'user');
+        Array.from(chat.querySelectorAll('.options-row button')).forEach(b => b.disabled = true);
+        envoyerMessage({ action: opt.value });
+      });
+      row.appendChild(btn);
+    });
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function ajouterIndicateur() {
+    const el = document.createElement('div');
+    el.className = 'typing';
+    el.id = 'typing';
+    el.textContent = 'Le chatbot écrit…';
+    chat.appendChild(el);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function retirerIndicateur() {
+    const el = document.getElementById('typing');
+    if (el) el.remove();
+  }
+
+  function gererReponse(data) {
+    retirerIndicateur();
+    const bot = data.bot || {};
+    if (bot.message) ajouterBulle(bot.message, 'bot');
+    if (bot.options && bot.options.length > 0) {
+      ajouterOptions(bot.options);
+      // Si options présentes, on cache la zone de saisie texte
+      attendOptionUniquement = true;
+      zoneSaisie.style.display = 'none';
+    } else {
+      // Sinon on attend du texte libre, ou conversation terminée
+      const etat = data.conversation && data.conversation.etat;
+      if (etat === 'terminee') {
+        zoneSaisie.style.display = 'none';
+        attendOptionUniquement = true;
+      } else {
+        zoneSaisie.style.display = 'flex';
+        attendOptionUniquement = false;
+        inputTexte.value = '';
+        inputTexte.focus();
+      }
+    }
+  }
+
+  async function demarrer() {
+    chat.innerHTML = '';
+    conversationId = null;
+    ajouterIndicateur();
+    try {
+      const resp = await fetch('/api/chatbot/start/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF,
+        },
+        credentials: 'same-origin',
+      });
+      if (!resp.ok) throw new Error('Erreur démarrage : ' + resp.status);
+      const data = await resp.json();
+      conversationId = data.conversation.id;
+      gererReponse(data);
+    } catch (e) {
+      retirerIndicateur();
+      ajouterBulle('Impossible de démarrer la conversation. Vérifiez que vous êtes bien connecté en tant qu\'étudiant.', 'bot');
+    }
+  }
+
+  async function envoyerMessage(payload) {
+    if (!conversationId) return;
+    ajouterIndicateur();
+    try {
+      const resp = await fetch(`/api/chatbot/${conversationId}/message/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      gererReponse(data);
+    } catch (e) {
+      retirerIndicateur();
+      ajouterBulle('Erreur réseau, réessayez.', 'bot');
+    }
+  }
+
+  btnEnvoyer.addEventListener('click', () => {
+    const texte = inputTexte.value.trim();
+    if (!texte) return;
+    ajouterBulle(texte, 'user');
+    inputTexte.value = '';
+    envoyerMessage({ texte });
+  });
+
+  inputTexte.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      btnEnvoyer.click();
+    }
+  });
+
+  btnReset.addEventListener('click', demarrer);
+
+  // Lance la conversation au chargement
+  demarrer();
+})();
+</script>
+{% endblock %}

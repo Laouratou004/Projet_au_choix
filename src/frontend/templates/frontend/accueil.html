@@ -1,0 +1,55 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Bienvenue — Réclamations académiques{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center py-5">
+  <div class="col-md-7 text-center">
+    <h1 class="display-5 fw-bold mb-3">
+      <i class="bi bi-chat-dots text-primary"></i>
+      Réclamations académiques
+    </h1>
+    <p class="lead text-muted mb-4">
+      Déposez et suivez vos réclamations (notes, scolarité, examens, bourse) en quelques clics, accompagné par notre chatbot.
+    </p>
+    <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+      <a href="{% url 'frontend:connexion' %}" class="btn btn-primary btn-lg px-4">
+        <i class="bi bi-box-arrow-in-right"></i> Se connecter
+      </a>
+      <a href="{% url 'frontend:inscription' %}" class="btn btn-outline-primary btn-lg px-4">
+        <i class="bi bi-person-plus"></i> Créer un compte
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mt-3">
+  <div class="col-md-4">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body text-center">
+        <i class="bi bi-1-circle-fill text-primary fs-1"></i>
+        <h5 class="card-title mt-2">Déposez</h5>
+        <p class="card-text text-muted">Le chatbot vous guide pas à pas : catégorie, description, confirmation.</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body text-center">
+        <i class="bi bi-2-circle-fill text-primary fs-1"></i>
+        <h5 class="card-title mt-2">Recevez votre référence</h5>
+        <p class="card-text text-muted">Une référence unique (REC-AAAA-NNN) vous est attribuée pour suivre votre dossier.</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body text-center">
+        <i class="bi bi-3-circle-fill text-primary fs-1"></i>
+        <h5 class="card-title mt-2">Suivez le traitement</h5>
+        <p class="card-text text-muted">Consultez à tout moment le statut de votre réclamation.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

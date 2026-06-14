@@ -43,7 +43,12 @@ INSTALLED_APPS = [
     'users',
     'reclamations',
     'chatbot',
+    'frontend',
 ]
+
+LOGIN_URL = '/connexion/'
+LOGIN_REDIRECT_URL = '/etudiant/'
+LOGOUT_REDIRECT_URL = '/'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
