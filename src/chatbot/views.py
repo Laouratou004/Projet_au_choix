@@ -74,10 +74,20 @@ class MesConversationsView(APIView):
 
 
 class ConversationDetailView(APIView):
-    """Renvoie l'état courant d'une conversation pour reprise ou consultation."""
+    """Renvoie l'état courant d'une conversation pour reprise ou consultation.
+
+    Permet aussi à l'étudiant de supprimer sa conversation (DELETE).
+    La suppression de la conversation n'affecte PAS la réclamation
+    éventuellement déjà créée — c'est uniquement l'historique de chat.
+    """
 
     permission_classes = [IsAuthenticated, IsEtudiant]
 
     def get(self, request, pk):
         conversation = get_object_or_404(Conversation, pk=pk, etudiant=request.user)
         return Response(_payload(conversation, reponse_pour(conversation)))
+
+    def delete(self, request, pk):
+        conversation = get_object_or_404(Conversation, pk=pk, etudiant=request.user)
+        conversation.delete()
+        return Response(status=204)

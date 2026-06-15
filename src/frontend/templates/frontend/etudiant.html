@@ -288,29 +288,43 @@
         const badge = terminee
           ? `<span class="badge badge-etat-terminee">Terminée</span>`
           : `<span class="badge badge-etat-active">En cours — ${escapeHtml(c.etat_display)}</span>`;
-        const action = terminee
+        const actionPrincipale = terminee
           ? `<button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-check2"></i> Clôturée</button>`
           : `<button class="btn btn-sm btn-primary" data-reprendre="${c.id}"><i class="bi bi-play-fill"></i> Reprendre</button>`;
+        const btnSuppr = `<button class="btn btn-sm btn-outline-danger ms-1" data-supprimer-conv="${c.id}" title="Supprimer cette conversation"><i class="bi bi-trash"></i></button>`;
         return `
           <tr>
             <td>${fmtDate(c.date_creation)}</td>
             <td>${badge}</td>
             <td>${escapeHtml(c.categorie || '—')}</td>
             <td><code>${c.reference || '—'}</code></td>
-            <td>${action}</td>
+            <td>${actionPrincipale}${btnSuppr}</td>
           </tr>`;
       }).join('');
       Array.from(tbody.querySelectorAll('[data-reprendre]')).forEach(b => {
         b.addEventListener('click', () => {
           const id = parseInt(b.dataset.reprendre, 10);
-          // bascule onglet chatbot
           new bootstrap.Tab(document.querySelector('[data-bs-target="#tab-chatbot"]')).show();
           reprendre(id);
         });
       });
+      Array.from(tbody.querySelectorAll('[data-supprimer-conv]')).forEach(b => {
+        b.addEventListener('click', () => supprimerConversation(parseInt(b.dataset.supprimerConv, 10)));
+      });
     } catch (e) {
       tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">Erreur de chargement.</td></tr>';
     }
+  }
+  async function supprimerConversation(id) {
+    if (!confirm('Supprimer définitivement cette conversation ? La réclamation éventuellement déjà créée ne sera PAS supprimée.')) return;
+    try {
+      const resp = await fetch(`/api/chatbot/${id}/`, {
+        method: 'DELETE',
+        headers: { 'X-CSRFToken': CSRF }, credentials: 'same-origin',
+      });
+      if (!resp.ok) throw new Error(resp.status);
+      chargerConversations();
+    } catch (e) { alert('Suppression impossible.'); }
   }
 
   // ---------- Mes réclamations ----------
@@ -345,12 +359,42 @@
   function ouvrirReclamation(id) {
     const r = reclamationsCache.find(x => x.id === id);
     if (!r) return;
+    const modifiable = r.statut === 'soumise';
     document.getElementById('mr-ref').innerHTML = `<code>${r.reference}</code>`;
     const messagesHtml = (r.messages || []).map(m => `
       <div class="msg-bubble">
         <div>${escapeHtml(m.contenu)}</div>
         <small>— ${escapeHtml(m.auteur_username)}, le ${fmtDate(m.date)}</small>
       </div>`).join('') || '<em class="text-muted">Pas encore de réponse de l\'administration.</em>';
+
+    const actionsHtml = modifiable
+      ? `
+        <hr>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-primary btn-sm" id="btn-modifier">
+            <i class="bi bi-pencil"></i> Modifier la description
+          </button>
+          <button class="btn btn-outline-danger btn-sm" id="btn-supprimer">
+            <i class="bi bi-trash"></i> Supprimer cette réclamation
+          </button>
+        </div>
+        <div id="zone-modif" class="mt-2" style="display:none;">
+          <label class="form-label">Nouvelle description</label>
+          <textarea id="input-modif" class="form-control mb-2" rows="4">${escapeHtml(r.description)}</textarea>
+          <button class="btn btn-primary btn-sm" id="btn-valider-modif">
+            <i class="bi bi-check"></i> Enregistrer
+          </button>
+          <button class="btn btn-link btn-sm" id="btn-annuler-modif">Annuler</button>
+        </div>
+        <div id="alert-actions" class="mt-2"></div>`
+      : `
+        <hr>
+        <div class="alert alert-info py-2 small mb-0">
+          <i class="bi bi-info-circle"></i>
+          Votre réclamation est déjà prise en charge par l'administration.
+          Vous ne pouvez plus la modifier ni la supprimer.
+        </div>`;
+
     document.getElementById('mr-body').innerHTML = `
       <dl class="row">
         <dt class="col-sm-3">Catégorie</dt>
@@ -358,7 +402,7 @@
         <dt class="col-sm-3">Statut</dt>
         <dd class="col-sm-9"><span class="badge badge-statut-${r.statut}">${escapeHtml(r.statut_display)}</span></dd>
         <dt class="col-sm-3">Description</dt>
-        <dd class="col-sm-9">${escapeHtml(r.description)}</dd>
+        <dd class="col-sm-9" id="mr-desc">${escapeHtml(r.description)}</dd>
         <dt class="col-sm-3">Date dépôt</dt>
         <dd class="col-sm-9">${fmtDate(r.date_creation)}</dd>
         <dt class="col-sm-3">Dernière MAJ</dt>
@@ -366,7 +410,58 @@
       </dl>
       <hr>
       <h6><i class="bi bi-chat-left-text"></i> Réponses de l'administration</h6>
-      <div>${messagesHtml}</div>`;
+      <div>${messagesHtml}</div>
+      ${actionsHtml}`;
+
+    if (modifiable) {
+      const btnModifier = document.getElementById('btn-modifier');
+      const btnSupprimer = document.getElementById('btn-supprimer');
+      const zoneModif = document.getElementById('zone-modif');
+      const inputModif = document.getElementById('input-modif');
+      const alert = document.getElementById('alert-actions');
+
+      btnModifier.addEventListener('click', () => { zoneModif.style.display = 'block'; inputModif.focus(); });
+      document.getElementById('btn-annuler-modif').addEventListener('click', () => {
+        zoneModif.style.display = 'none';
+      });
+      document.getElementById('btn-valider-modif').addEventListener('click', async () => {
+        const description = inputModif.value.trim();
+        if (description.length < 5) {
+          alert.innerHTML = '<div class="alert alert-warning py-2 mb-0">Description trop courte.</div>';
+          return;
+        }
+        try {
+          const resp = await fetch(`/api/reclamations/mes-reclamations/${id}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type':'application/json', 'X-CSRFToken': CSRF },
+            credentials: 'same-origin',
+            body: JSON.stringify({ description }),
+          });
+          if (!resp.ok) { const d = await resp.json(); throw new Error(d.detail || resp.status); }
+          alert.innerHTML = '<div class="alert alert-success py-2 mb-0">✓ Description mise à jour.</div>';
+          document.getElementById('mr-desc').textContent = description;
+          zoneModif.style.display = 'none';
+          chargerReclamations();
+        } catch (e) {
+          alert.innerHTML = `<div class="alert alert-danger py-2 mb-0">${escapeHtml(e.message)}</div>`;
+        }
+      });
+      btnSupprimer.addEventListener('click', async () => {
+        if (!confirm('Supprimer définitivement cette réclamation ?')) return;
+        try {
+          const resp = await fetch(`/api/reclamations/mes-reclamations/${id}/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': CSRF }, credentials: 'same-origin',
+          });
+          if (!resp.ok) { const d = await resp.json(); throw new Error(d.detail || resp.status); }
+          modalReclamation.hide();
+          chargerReclamations();
+        } catch (e) {
+          alert.innerHTML = `<div class="alert alert-danger py-2 mb-0">${escapeHtml(e.message)}</div>`;
+        }
+      });
+    }
+
     modalReclamation.show();
   }
 

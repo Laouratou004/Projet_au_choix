@@ -37,6 +37,51 @@ class MesReclamationsView(APIView):
         return Response(ReclamationDetailSerializer(qs, many=True).data)
 
 
+class MaReclamationDetailView(APIView):
+    """Permet à l'étudiant de modifier ou supprimer SA réclamation.
+
+    Pour préserver l'intégrité du traitement, ces actions ne sont
+    possibles que tant que le dossier n'a pas été pris en charge
+    par l'administration (statut == 'soumise').
+    """
+
+    permission_classes = [IsAuthenticated, IsEtudiant]
+
+    def _get(self, request, pk):
+        return Reclamation.objects.filter(pk=pk, etudiant=request.user).first()
+
+    def patch(self, request, pk):
+        reclamation = self._get(request, pk)
+        if reclamation is None:
+            return Response({'detail': 'Réclamation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        if reclamation.statut != Reclamation.STATUT_SOUMISE:
+            return Response(
+                {'detail': "Modification impossible : votre réclamation est déjà en cours de traitement."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        description = (request.data.get('description') or '').strip()
+        if len(description) < 5:
+            return Response(
+                {'detail': 'La description doit contenir au moins 5 caractères.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        reclamation.description = description
+        reclamation.save(update_fields=['description', 'date_maj'])
+        return Response({'detail': 'Réclamation mise à jour.'})
+
+    def delete(self, request, pk):
+        reclamation = self._get(request, pk)
+        if reclamation is None:
+            return Response({'detail': 'Réclamation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        if reclamation.statut != Reclamation.STATUT_SOUMISE:
+            return Response(
+                {'detail': "Suppression impossible : votre réclamation est déjà en cours de traitement."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        reclamation.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class ReclamationListView(APIView):
     """
     [S4.1] Liste des réclamations reçues — accès administration.

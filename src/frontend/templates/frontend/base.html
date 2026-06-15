@@ -28,9 +28,7 @@
               <span class="navbar-text text-white me-3">
                 <i class="bi bi-person-circle"></i>
                 {{ user.get_full_name|default:user.username }}
-                {% if user.is_superuser %}
-                  <span class="badge bg-warning text-dark ms-1">Super admin</span>
-                {% elif user.is_staff or user.role == 'admin' %}
+                {% if user.is_superuser or user.is_staff or user.role == 'admin' %}
                   <span class="badge bg-light text-primary ms-1">Administration</span>
                 {% else %}
                   <span class="badge bg-light text-primary ms-1">Étudiant</span>
