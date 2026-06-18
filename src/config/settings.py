@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
+# Racine du projet (src/) : utilisée pour localiser la base SQLite,
+# les templates, etc.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -20,15 +22,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+# Clé secrète Django : sert au signage des sessions et tokens. À régénérer
+# et à externaliser (variable d'environnement) avant un déploiement réel.
 SECRET_KEY = 'django-insecure-vr*lsmxvz++!f^we5=ax3pmj=cix(h+ru@i$)f=%lo5t@v-@xi'
 
 # SECURITY WARNING: don't run with debug turned on in production!
+# DEBUG=True : affiche les pages d'erreur détaillées (utile en dev,
+# dangereux en prod car expose le code et les variables).
 DEBUG = True
 
+# Hôtes autorisés à servir l'application. En prod, ajouter le domaine réel.
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
 # Application definition
+# Ordre indicatif : apps Django natives, puis bibliothèques tierces (DRF,
+# corsheaders), puis nos apps métier.
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -38,20 +47,23 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'rest_framework.authtoken',
-    'corsheaders',
-    'users',
-    'reclamations',
-    'chatbot',
-    'frontend',
+    'rest_framework.authtoken',  # tokens d'authentification API
+    'corsheaders',                # autorise les appels JS cross-origin
+    'users',                      # modèle User personnalisé + auth
+    'reclamations',               # cœur métier : réclamations + messages
+    'chatbot',                    # parcours guidé de dépôt
+    'frontend',                   # pages HTML
 ]
 
+# URLs utilisées par @login_required et auth.LoginView pour rediriger.
 LOGIN_URL = '/connexion/'
 LOGIN_REDIRECT_URL = '/etudiant/'
 LOGOUT_REDIRECT_URL = '/'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # CorsMiddleware doit être placé tôt pour intercepter les requêtes
+    # cross-origin avant que d'autres middlewares ne renvoient des erreurs.
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -61,15 +73,24 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Tout autoriser : OK en dev. En prod, restreindre à la liste exacte des
+# origines connues via CORS_ALLOWED_ORIGINS.
 CORS_ALLOW_ALL_ORIGINS = True
 
+# On utilise notre modèle User personnalisé (avec champ "role") à la
+# place de django.contrib.auth.models.User.
 AUTH_USER_MODEL = 'users.User'
 
 REST_FRAMEWORK = {
+    # Deux backends acceptés :
+    # - TokenAuthentication : utilisée par le frontend JS (Authorization: Token ...).
+    # - SessionAuthentication : utile pour l'admin Django et le développement.
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
+    # Par défaut : lecture publique, écriture authentifiée. Chaque vue
+    # peut surcharger avec IsAdmin / IsEtudiant pour être plus stricte.
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
@@ -81,6 +102,8 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [],
+        # APP_DIRS=True : Django cherche les templates dans <app>/templates/
+        # (utilisé par frontend/templates/frontend/*.html).
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -98,6 +121,8 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# SQLite : simple, sans serveur. Pratique pour un projet d'étude.
+# En prod, passer à PostgreSQL via variable d'environnement.
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -110,6 +135,9 @@ DATABASES = {
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
+# Validateurs appliqués à la création/modification d'un mot de passe.
+# Empêchent les mots de passe trop similaires au username, trop courts,
+# trop communs (12345...) ou purement numériques.
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -129,12 +157,15 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
+# Langue et fuseau choisis pour correspondre au contexte universitaire
+# guinéen du projet (Conakry, UTC+0).
 LANGUAGE_CODE = 'fr-fr'
 
 TIME_ZONE = 'Africa/Conakry'
 
 USE_I18N = True
 
+# USE_TZ=True : les datetimes sont stockés en UTC et convertis à l'affichage.
 USE_TZ = True
 
 

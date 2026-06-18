@@ -1,4 +1,9 @@
 """URLs du module réclamations (administration)."""
+# Préfixées par /api/reclamations/ dans config/urls.py.
+# Deux espaces se côtoient :
+#   - /mes-reclamations/...  : actions de l'étudiant sur SES dossiers
+#   - /, /<pk>/...            : actions de l'administration sur tous les dossiers
+
 # pyrefly: ignore [missing-import]
 from django.urls import path
 

@@ -1,3 +1,9 @@
+# Modèle de persistance d'une conversation chatbot.
+# Le chatbot fonctionne en machine à états : chaque échange avec l'étudiant
+# fait avancer la conversation d'un état au suivant. On sauvegarde l'état
+# et le contexte en base pour pouvoir reprendre une conversation interrompue
+# (rafraîchissement de page, reconnexion...).
+
 from django.conf import settings
 from django.db import models
 
@@ -10,6 +16,9 @@ class Conversation(models.Model):
     les données saisies par l'étudiant tout au long de la conversation.
     """
 
+    # États du parcours guidé. Le diagramme de transitions est implémenté
+    # dans engine.traiter_message(). Ne pas modifier les valeurs des
+    # constantes sans migration : elles sont persistées en base.
     ETAT_ACCUEIL = 'accueil'
     ETAT_CHOIX_ACTION = 'choix_action'
     ETAT_CATEGORIE_DEMANDEE = 'categorie_demandee'
@@ -39,6 +48,9 @@ class Conversation(models.Model):
         related_name='conversations',
     )
     etat = models.CharField(max_length=30, choices=ETAT_CHOICES, default=ETAT_ACCUEIL)
+    # JSONField : structure libre où l'on stocke les données collectées au
+    # fil du dialogue (catégorie choisie, description, précisions, référence
+    # de réclamation créée, etc.). Voir engine.py pour le détail des clés.
     contexte = models.JSONField(default=dict, blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)
     date_maj = models.DateTimeField(auto_now=True)

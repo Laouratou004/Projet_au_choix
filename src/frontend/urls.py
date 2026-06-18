@@ -1,3 +1,7 @@
+# Routes HTML servies par l'app frontend.
+# Toutes ces URLs renvoient des pages HTML (pas du JSON) ; le JavaScript
+# embarqué dans les templates consomme ensuite les APIs /api/*.
+
 from django.urls import path
 
 from .views import (
@@ -12,10 +16,10 @@ from .views import (
 app_name = 'frontend'
 
 urlpatterns = [
-    path('', accueil, name='accueil'),
-    path('connexion/', ConnexionView.as_view(), name='connexion'),
-    path('deconnexion/', DeconnexionView.as_view(), name='deconnexion'),
-    path('etudiant/', etudiant, name='etudiant'),
-    path('administration/', administration, name='administration'),
-    path('administration/creer-etudiant/', creer_etudiant, name='creer_etudiant'),
+    path('', accueil, name='accueil'),                                                # accueil public
+    path('connexion/', ConnexionView.as_view(), name='connexion'),                    # formulaire de login
+    path('deconnexion/', DeconnexionView.as_view(), name='deconnexion'),              # POST logout
+    path('etudiant/', etudiant, name='etudiant'),                                      # espace étudiant
+    path('administration/', administration, name='administration'),                    # espace admin
+    path('administration/creer-etudiant/', creer_etudiant, name='creer_etudiant'),    # création de compte par l'admin
 ]

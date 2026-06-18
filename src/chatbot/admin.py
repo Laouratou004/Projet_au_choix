@@ -1,3 +1,7 @@
+# Admin Django pour le module chatbot.
+# Utile pour inspecter une conversation en cours de debug (état courant,
+# contenu du contexte JSON, etc.).
+
 from django.contrib import admin
 
 from .models import Conversation

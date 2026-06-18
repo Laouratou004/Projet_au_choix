@@ -1,3 +1,8 @@
+# API REST du chatbot. Réservée aux étudiants.
+# Le frontend communique avec ces endpoints en envoyant l'action de
+# l'étudiant (clic sur un bouton) ou son texte libre ; le serveur calcule
+# la nouvelle réponse du bot via le moteur de dialogue (engine.py).
+
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,6 +17,9 @@ from .serializers import ConversationSerializer, MessageEntrantSerializer
 
 def _payload(conversation, reponse):
     """Assemble la réponse JSON renvoyée à l'étudiant."""
+    # Format unique partagé par toutes les vues : on renvoie à la fois
+    # l'état brut de la conversation (pour suivi côté client) et la
+    # réponse calculée du bot (message + options).
     return {
         'conversation': ConversationSerializer(conversation).data,
         'bot': reponse,
@@ -24,6 +32,8 @@ class StartConversationView(APIView):
     permission_classes = [IsAuthenticated, IsEtudiant]
 
     def post(self, request):
+        # On laisse la valeur par défaut ETAT_ACCUEIL : reponse_pour()
+        # renverra automatiquement le message de bienvenue.
         conversation = Conversation.objects.create(etudiant=request.user)
         return Response(_payload(conversation, reponse_pour(conversation)), status=201)
 
@@ -34,11 +44,15 @@ class MessageView(APIView):
     permission_classes = [IsAuthenticated, IsEtudiant]
 
     def post(self, request, pk):
+        # Filtre etudiant=request.user : empêche l'accès aux conversations
+        # d'un autre utilisateur même en devinant un id.
         conversation = get_object_or_404(
             Conversation, pk=pk, etudiant=request.user,
         )
         serializer = MessageEntrantSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # action = clic sur un bouton (ex: 'deposer', 'confirmer')
+        # texte  = saisie libre (description, précision, référence...)
         reponse = traiter_message(
             conversation,
             action=serializer.validated_data.get('action', ''),
@@ -58,6 +72,8 @@ class MesConversationsView(APIView):
 
     def get(self, request):
         conversations = Conversation.objects.filter(etudiant=request.user)
+        # Sérialisation manuelle pour ne renvoyer qu'un résumé léger
+        # (le contenu complet du contexte n'est pas utile dans la liste).
         data = [
             {
                 'id': c.pk,
@@ -88,6 +104,8 @@ class ConversationDetailView(APIView):
         return Response(_payload(conversation, reponse_pour(conversation)))
 
     def delete(self, request, pk):
+        # Pas de CASCADE vers Reclamation : la réclamation déjà créée est
+        # conservée car elle suit son propre cycle de vie côté admin.
         conversation = get_object_or_404(Conversation, pk=pk, etudiant=request.user)
         conversation.delete()
         return Response(status=204)

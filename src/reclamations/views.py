@@ -1,3 +1,11 @@
+# Vues API du module réclamations.
+# Deux familles d'endpoints :
+#   - Espace étudiant : consulter / modifier / supprimer SES réclamations.
+#   - Espace administration : lister toutes les réclamations, changer leur
+#     statut, y répondre, consulter le tableau de bord global.
+# Les filtres de permission IsEtudiant / IsAdmin (users/permissions.py)
+# verrouillent l'accès au bon rôle.
+
 # pyrefly: ignore [missing-import]
 from django.db.models import Count
 
@@ -28,6 +36,8 @@ class MesReclamationsView(APIView):
     permission_classes = [IsAuthenticated, IsEtudiant]
 
     def get(self, request):
+        # prefetch_related : on charge en une seule requête tous les messages
+        # et leurs auteurs (évite le problème N+1 quand on sérialise la liste).
         qs = (
             Reclamation.objects
             .filter(etudiant=request.user)
@@ -48,24 +58,34 @@ class MaReclamationDetailView(APIView):
     permission_classes = [IsAuthenticated, IsEtudiant]
 
     def _get(self, request, pk):
+        # Filtre crucial sur etudiant=request.user : empêche un étudiant
+        # d'accéder à la réclamation d'un autre via une URL devinée.
         return Reclamation.objects.filter(pk=pk, etudiant=request.user).first()
 
     def patch(self, request, pk):
         reclamation = self._get(request, pk)
         if reclamation is None:
             return Response({'detail': 'Réclamation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        # Règle métier : on ne modifie plus une réclamation prise en charge.
+        # 409 (Conflict) indique au frontend que la demande est légitime
+        # mais incompatible avec l'état actuel de la ressource.
         if reclamation.statut != Reclamation.STATUT_SOUMISE:
             return Response(
                 {'detail': "Modification impossible : votre réclamation est déjà en cours de traitement."},
                 status=status.HTTP_409_CONFLICT,
             )
         description = (request.data.get('description') or '').strip()
+        # Validation minimale côté serveur (le frontend valide aussi, mais
+        # on ne fait jamais confiance au client).
         if len(description) < 5:
             return Response(
                 {'detail': 'La description doit contenir au moins 5 caractères.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         reclamation.description = description
+        # update_fields : on ne met à jour que les colonnes nécessaires,
+        # ce qui évite de re-déclencher save() sur tous les champs et
+        # garde date_maj cohérente.
         reclamation.save(update_fields=['description', 'date_maj'])
         return Response({'detail': 'Réclamation mise à jour.'})
 
@@ -73,6 +93,8 @@ class MaReclamationDetailView(APIView):
         reclamation = self._get(request, pk)
         if reclamation is None:
             return Response({'detail': 'Réclamation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        # Même règle que pour la modification : pas de suppression après
+        # prise en charge (traçabilité du dossier côté admin).
         if reclamation.statut != Reclamation.STATUT_SOUMISE:
             return Response(
                 {'detail': "Suppression impossible : votre réclamation est déjà en cours de traitement."},
@@ -95,9 +117,14 @@ class ReclamationListView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request):
+        # select_related : jointure SQL avec User pour récupérer l'auteur
+        # en une seule requête (utilisé par le serializer pour afficher
+        # username / email dans la liste).
         qs = Reclamation.objects.select_related('etudiant').order_by('-date_creation')
 
         # --- Filtres [S4.2] ---
+        # Les filtres sont optionnels et cumulables. Aucun filtre = liste
+        # complète. Les valeurs invalides retournent simplement une liste vide.
         categorie = request.query_params.get('categorie')
         statut = request.query_params.get('statut')
 
@@ -122,6 +149,8 @@ class ReclamationDetailView(APIView):
 
     def _get_reclamation(self, pk):
         try:
+            # prefetch des messages pour afficher le fil de discussion
+            # complet sans déclencher une requête par message.
             return Reclamation.objects.prefetch_related('messages__auteur').get(pk=pk)
         except Reclamation.DoesNotExist:
             return None
@@ -150,12 +179,16 @@ class ReclamationStatutView(APIView):
         except Reclamation.DoesNotExist:
             return Response({'detail': 'Réclamation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
 
+        # Le serializer vérifie que le statut envoyé fait bien partie
+        # des valeurs autorisées (ChoiceField).
         serializer = StatutUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         reclamation.statut = serializer.validated_data['statut']
         reclamation.save(update_fields=['statut', 'date_maj'])
 
+        # On renvoie aussi le libellé lisible pour éviter au frontend de
+        # devoir maintenir un mapping clé → libellé en parallèle.
         return Response({
             'detail': 'Statut mis à jour.',
             'statut': reclamation.statut,
@@ -183,6 +216,9 @@ class ReclamationReponseView(APIView):
         serializer = ReponseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        # L'auteur du message est forcé à l'utilisateur authentifié : on
+        # ne fait pas confiance à un éventuel champ "auteur" envoyé par
+        # le client.
         message = Message.objects.create(
             reclamation=reclamation,
             auteur=request.user,
@@ -212,6 +248,8 @@ class DashboardView(APIView):
     def get(self, request):
         total = Reclamation.objects.count()
 
+        # Agrégations SQL : on regroupe en base plutôt que de tout charger
+        # en mémoire, ce qui passe à l'échelle même avec beaucoup de dossiers.
         par_statut = (
             Reclamation.objects
             .values('statut')
@@ -226,7 +264,8 @@ class DashboardView(APIView):
             .order_by('categorie')
         )
 
-        # Enrichissement avec les libellés lisibles
+        # Enrichissement avec les libellés lisibles : le frontend peut
+        # afficher "Notes" plutôt que "notes" sans dupliquer le mapping.
         statut_map = dict(Reclamation.STATUT_CHOICES)
         categorie_map = dict(Reclamation.CATEGORIE_CHOICES)
 
